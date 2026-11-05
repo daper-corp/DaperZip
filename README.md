@@ -4,7 +4,7 @@
 
 7-Zip 엔진을 쓰는 압축 프로그램입니다. Windows · macOS · Linux에서 동작합니다.
 
-**다운로드: https://daper-corp.github.io/DaperZip/**
+**다운로드: https://zip.dapercorp.com/**
 
 ![DaperZip](docs/screenshots/folder.png)
 

@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://daper-corp.github.io/DaperZip/</loc>
+    <loc>https://zip.dapercorp.com/</loc>
     <lastmod>2026-11-05</lastmod>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://daper-corp.github.io/DaperZip/"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://daper-corp.github.io/DaperZip/en/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zip.dapercorp.com/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zip.dapercorp.com/en/"/>
   </url>
   <url>
-    <loc>https://daper-corp.github.io/DaperZip/en/</loc>
+    <loc>https://zip.dapercorp.com/en/</loc>
     <lastmod>2026-11-05</lastmod>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://daper-corp.github.io/DaperZip/"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://daper-corp.github.io/DaperZip/en/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zip.dapercorp.com/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zip.dapercorp.com/en/"/>
   </url>
 </urlset>
