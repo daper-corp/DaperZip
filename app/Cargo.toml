@@ -1,0 +1,32 @@
+[package]
+name = "daperzip"
+description = "DaperZip - file archiver powered by 7-Zip"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+default-run = "daperzip"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+daperzip-core = { path = "../crates/daperzip-core" }
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+drag = "2"
+clipboard-rs = { version = "0.3", default-features = false }
+ureq = { version = "3", features = ["platform-verifier"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.56"
+windows-sys = { version = "0.61", features = ["Win32_UI_Shell"] }

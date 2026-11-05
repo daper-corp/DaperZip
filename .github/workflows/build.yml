@@ -1,0 +1,182 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # Reads the app version and decides whether this push is a new release.
+  #
+  # Automatic release: when a push to main carries an app version that has no
+  # tag yet (e.g. 0.1.1 → no v0.1.1) AND release notes exist in
+  # release-notes/v<version>.md, the release job creates tag + release.
+  # Bump the version with scripts/bump-version.sh.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      release: ${{ steps.v.outputs.release }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+      notes: ${{ steps.v.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        shell: bash
+        run: |
+          V=$(jq -r .version app/tauri.conf.json)
+          CARGO_V=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          if [ "$V" != "$CARGO_V" ]; then
+            echo "::error::Version mismatch: app/tauri.conf.json=$V, Cargo.toml=$CARGO_V (use scripts/bump-version.sh)"
+            exit 1
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          # 0.x versions and versions like 1.0.0-beta.1 are pre-releases
+          if [[ "$V" == 0.* || "$V" == *-* ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
+          NOTES="release-notes/v$V.md"
+          RELEASE=false
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            if git ls-remote --exit-code --tags origin "refs/tags/v$V" >/dev/null; then
+              echo "v$V is already released."
+            elif [ -f "$NOTES" ]; then
+              echo "New version v$V with notes → will release after the builds pass."
+              RELEASE=true
+            else
+              echo "::warning::Version $V has no tag yet but $NOTES is missing, so no release is made. Add the notes to release."
+            fi
+          fi
+          echo "release=$RELEASE" >> "$GITHUB_OUTPUT"
+          echo "notes=$NOTES" >> "$GITHUB_OUTPUT"
+
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            sevenzip: windows-x64
+            args: ""
+          - os: macos-latest
+            sevenzip: macos
+            args: "--target universal-apple-darwin"
+          - os: ubuntu-22.04
+            sevenzip: linux-x64
+            args: ""
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 7-Zip is committed under vendor/7zip/ (no download needed); just
+      # make sure the binaries are the ones recorded in SHA256SUMS.
+      - name: Verify bundled 7-Zip
+        shell: bash
+        run: |
+          cd vendor/7zip
+          if command -v sha256sum >/dev/null; then sha256sum -c SHA256SUMS; else shasum -a 256 -c SHA256SUMS; fi
+
+      - name: Test engine against the bundled 7-Zip
+        shell: bash
+        run: |
+          export DAPERZIP_7Z="$PWD/vendor/7zip/${{ matrix.sevenzip }}/$([ "$RUNNER_OS" = "Windows" ] && echo 7z.exe || echo 7zz)"
+          cargo test -p daperzip-core
+
+      - name: Build app
+        working-directory: app
+        run: npx -y @tauri-apps/cli@2 build ${{ matrix.args }}
+
+      # Explorer integration: register / unregister in both scopes and check
+      # the registry (runners are admins, so HKLM is writable).
+      - name: Check Explorer menu registration
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $exe = (Get-Item target/release/DaperZip.exe -ErrorAction SilentlyContinue) ?? (Get-Item target/release/daperzip.exe)
+          foreach ($scope in 'user', 'machine') {
+            $hive = if ($scope -eq 'user') { 'HKCU:' } else { 'HKLM:' }
+            Start-Process $exe.FullName -ArgumentList "--register-shell=$scope" -Wait
+            $cmd = (Get-ItemProperty "$hive\Software\Classes\SystemFileAssociations\.zip\shell\DaperZip.Extract\shell\1smart\command").'(default)'
+            $cmd2 = (Get-ItemProperty "$hive\Software\Classes\Directory\shell\DaperZip.Compress\shell\1zip\command").'(default)'
+            Write-Host "[$scope] $cmd"
+            Write-Host "[$scope] $cmd2"
+            if ($cmd -notlike "*--extract-smart*" -or $cmd2 -notlike "*--compress-zip*") { throw "menu not registered ($scope)" }
+          }
+          Start-Process $exe.FullName -ArgumentList '--unregister-shell' -Wait
+          foreach ($hive in 'HKCU:', 'HKLM:') {
+            if (Test-Path -LiteralPath "$hive\Software\Classes\*\shell\DaperZip.Compress") { throw "menu not removed ($hive)" }
+          }
+          Write-Host "Explorer menu register/unregister OK"
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          mkdir -p dist
+          find target -path '*/release/bundle/*' \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' \) -exec cp {} dist/ \;
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            # portable build: DaperZip.exe + 7zip folder, no installer needed
+            mkdir -p portable/DaperZip/7zip
+            cp target/release/DaperZip.exe portable/DaperZip/ 2>/dev/null || cp target/release/daperzip.exe portable/DaperZip/DaperZip.exe
+            cp vendor/7zip/windows-x64/* vendor/7zip/License.txt portable/DaperZip/7zip/
+            cp LICENSE THIRD_PARTY_NOTICES.md portable/DaperZip/
+            (cd portable && 7z a ../dist/DaperZip-portable-windows-x64.zip DaperZip >/dev/null)
+          fi
+          ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: daperzip-${{ matrix.sevenzip }}
+          path: dist/*
+
+  release:
+    # tag pushed by hand, or a new version on main (see the version job)
+    if: startsWith(github.ref, 'refs/tags/v') || needs.version.outputs.release == 'true'
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      # New version on main: create tag v<version> on this commit and publish.
+      - name: Create release
+        if: needs.version.outputs.release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: DaperZip ${{ needs.version.outputs.version }}
+          body_path: ${{ needs.version.outputs.notes }}
+          prerelease: ${{ needs.version.outputs.prerelease == 'true' }}
+          files: dist/*
+          fail_on_unmatched_files: true
+
+      # Tag pushed by hand: attach the installers. If the release was created
+      # on GitHub first, its title, notes and pre-release flag are kept.
+      - name: Attach files to tagged release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          fail_on_unmatched_files: true

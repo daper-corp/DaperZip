@@ -1,0 +1,34 @@
+{
+  "bundle": {
+    "targets": [
+      "appimage",
+      "deb"
+    ],
+    "resources": {
+      "../vendor/7zip/linux-x64/7zz": "7zip/7zz",
+      "../vendor/7zip/License.txt": "7zip/License.txt"
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "zip",
+          "7z",
+          "rar",
+          "tar",
+          "gz",
+          "tgz",
+          "bz2",
+          "xz",
+          "txz",
+          "zst",
+          "iso",
+          "cab",
+          "wim"
+        ],
+        "mimeType": "application/zip",
+        "name": "Archive",
+        "description": "Archive"
+      }
+    ]
+  }
+}

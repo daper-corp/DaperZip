@@ -1,0 +1,6 @@
+/target
+/app/gen
+/dist
+/portable
+node_modules
+.DS_Store

@@ -1,0 +1,2 @@
+vendor/7zip/** binary
+*.sh text eol=lf

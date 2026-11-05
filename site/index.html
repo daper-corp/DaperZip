@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DaperZip</title>
+  <meta name="description" content="DaperZip — Windows, macOS, Linux용 압축 프로그램. 7-Zip 엔진 사용.">
+  <meta property="og:title" content="DaperZip">
+  <meta property="og:description" content="Windows · macOS · Linux 압축 프로그램 (7-Zip 엔진)">
+  <meta property="og:image" content="https://daper-corp.github.io/DaperZip/assets/screenshot-ko.png">
+  <meta property="og:url" content="https://daper-corp.github.io/DaperZip/">
+  <link rel="icon" href="favicon.ico?v=2" sizes="48x48">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=2">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png?v=2">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=2">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-row">
+      <a class="brand" href="#"><span class="logo" role="img" aria-label="Daper"></span><span>DaperZip</span></a>
+      <nav>
+        <a href="#features" data-i18n="nav.features">기능</a>
+        <a href="#download" data-i18n="nav.download">다운로드</a>
+        <a href="#install" data-i18n="nav.install">설치 안내</a>
+        <a href="https://github.com/daper-corp/DaperZip">GitHub</a>
+        <button id="lang" class="lang" type="button" aria-label="Language">EN</button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div class="hero-text">
+          <span class="badge" id="version-badge" data-i18n="hero.badge">베타</span>
+          <h1 data-i18n="hero.title">압축 파일을 쉽고 빠르게</h1>
+          <p class="lead" data-i18n="hero.lead">DaperZip은 Windows · macOS · Linux에서 쓰는 압축 프로그램입니다. 압축 처리는 7-Zip 엔진이 담당합니다.</p>
+          <div class="cta">
+            <a id="primary-dl" class="btn primary" href="https://github.com/daper-corp/DaperZip/releases/latest">
+              <span id="primary-label" data-i18n="dl.loading">다운로드</span>
+              <small id="primary-meta"></small>
+            </a>
+            <a class="btn ghost" href="#download" data-i18n="dl.other">다른 운영체제</a>
+          </div>
+          <p class="fine" id="primary-note"></p>
+        </div>
+        <figure class="shot">
+          <img id="hero-shot" src="assets/screenshot-ko.png" alt="DaperZip" width="1040" height="680">
+        </figure>
+      </div>
+    </section>
+
+    <section id="features" class="wrap section">
+      <h2 data-i18n="features.title">기능</h2>
+      <div class="features">
+        <article><h3 data-i18n="f1.t">대부분의 압축 형식</h3><p data-i18n="f1.d">ZIP, 7Z, RAR, TAR, GZ, XZ, ISO, CAB, WIM, LZH 등 7-Zip이 읽는 형식을 열고 풉니다.</p></article>
+        <article><h3 data-i18n="f2.t">스마트 풀기</h3><p data-i18n="f2.d">항목이 하나면 그 자리에, 여러 개면 압축 파일 이름의 폴더를 만들어 풉니다.</p></article>
+        <article><h3 data-i18n="f3.t">탐색기 오른쪽 클릭</h3><p data-i18n="f3.d">Windows 탐색기에서 바로 풀고 압축합니다. 여러 파일을 골라도 한 번에 처리합니다.</p></article>
+        <article><h3 data-i18n="f4.t">한글 파일 이름 그대로</h3><p data-i18n="f4.d">Mac에서 만든 압축 파일의 자모 분리, 옛 Windows(CP949) ZIP의 깨진 이름을 자동으로 바로잡습니다.</p></article>
+        <article><h3 data-i18n="f5.t">비밀번호와 분할 압축</h3><p data-i18n="f5.d">ZIP AES-256, 7Z 파일 이름 암호화, CD · 4GB 단위 분할 압축을 지원합니다.</p></article>
+        <article><h3 data-i18n="f6.t">압축 파일 바로 편집</h3><p data-i18n="f6.d">파일 추가 · 삭제 · 이름 바꾸기, 끌어다 놓기, 압축 파일 안의 파일을 열어 고치면 다시 반영합니다.</p></article>
+      </div>
+    </section>
+
+    <section id="download" class="section alt">
+      <div class="wrap">
+        <h2 data-i18n="download.title">다운로드</h2>
+        <p class="muted" id="release-line"></p>
+        <div class="platforms" id="platforms">
+          <div class="platform" data-os="windows">
+            <h3>Windows</h3><p class="muted">Windows 10 / 11 · x64</p><ul></ul>
+          </div>
+          <div class="platform" data-os="mac">
+            <h3>macOS</h3><p class="muted">10.15+ · Apple Silicon / Intel</p><ul></ul>
+          </div>
+          <div class="platform" data-os="linux">
+            <h3>Linux</h3><p class="muted">x64 · deb / AppImage</p><ul></ul>
+          </div>
+        </div>
+        <p class="muted small"><a href="https://github.com/daper-corp/DaperZip/releases" data-i18n="download.all">이전 버전과 변경 내역</a></p>
+      </div>
+    </section>
+
+    <section id="install" class="wrap section">
+      <h2 data-i18n="install.title">설치 안내</h2>
+      <div class="install">
+        <article>
+          <h3>Windows</h3>
+          <p data-i18n="install.win1">설치 프로그램에서 "나만 사용"(관리자 권한 불필요) 또는 "모든 사용자"를 고를 수 있습니다. 설치하면 탐색기 오른쪽 클릭 메뉴가 추가됩니다. Windows 11에서는 "추가 옵션 표시" 안에 있습니다.</p>
+          <p data-i18n="install.win2">"Windows의 PC 보호" 창이 나오면 "추가 정보" → "실행"을 누르세요. 코드 서명을 준비 중입니다.</p>
+        </article>
+        <article>
+          <h3>macOS</h3>
+          <p data-i18n="install.mac1">dmg를 열고 DaperZip을 응용 프로그램 폴더로 끌어 놓으세요.</p>
+          <p data-i18n="install.mac2">처음 실행할 때 경고가 나오면 Finder에서 DaperZip을 오른쪽 클릭 → "열기"를 누르세요.</p>
+        </article>
+        <article>
+          <h3>Linux</h3>
+          <p data-i18n="install.linux1">Debian · Ubuntu 계열은 .deb를 설치하세요. 그 밖의 배포판은 AppImage에 실행 권한을 주고 실행합니다.</p>
+          <pre><code>chmod +x DaperZip_*.AppImage</code></pre>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <p><span data-i18n="foot.license">DaperZip은 MIT 라이선스 오픈소스입니다.</span> <a href="https://github.com/daper-corp/DaperZip">GitHub</a> · <a href="https://dapercorp.com">Daper</a></p>
+    <p class="muted small" data-i18n="foot.7zip">압축 엔진: 7-Zip (Igor Pavlov, GNU LGPL + unRAR 제한). DaperZip은 7-Zip과 별개의 프로젝트입니다.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
