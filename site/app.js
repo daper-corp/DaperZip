@@ -1,4 +1,4 @@
-// DaperZip site: language switch + latest release downloads from GitHub.
+// DaperZip site: latest release downloads from GitHub.
 (function () {
   const REPO = "daper-corp/DaperZip";
   const RELEASES = `https://github.com/${REPO}/releases`;
@@ -25,35 +25,16 @@
     "foot.license": "DaperZip is open source under the MIT license.",
     "foot.7zip": "Compression engine: 7-Zip by Igor Pavlov (GNU LGPL + unRAR restriction). DaperZip is a separate project from 7-Zip.",
   };
-  const KO = {}; // filled from the page's original text
+  const KO = { "dl.loading": "다운로드" };
   const T = {
     ko: { forOs: (os) => `${os}용 다운로드`, installer: "설치 프로그램", portable: "포터블 (압축만 풀면 실행)", dmg: "디스크 이미지 (.dmg)", deb: "Debian / Ubuntu (.deb)", appimage: "AppImage (모든 배포판)", released: (v, d) => `최신 버전 ${v} · ${d}`, pre: "베타", unavailable: "아직 파일이 없습니다. GitHub 릴리스 페이지에서 확인하세요.", mobile: "DaperZip은 PC용 프로그램입니다. 아래에서 운영체제별 파일을 받을 수 있습니다.", alsoPortable: "설치 없이 쓰려면", portableLink: "포터블 버전" },
     en: { forOs: (os) => `Download for ${os}`, installer: "Installer", portable: "Portable (unzip and run)", dmg: "Disk image (.dmg)", deb: "Debian / Ubuntu (.deb)", appimage: "AppImage (any distribution)", released: (v, d) => `Latest ${v} · ${d}`, pre: "Beta", unavailable: "No files yet. See the GitHub releases page.", mobile: "DaperZip is a desktop app. Pick your platform below.", alsoPortable: "No install needed:", portableLink: "portable version" },
   };
 
   // ---------------- language ----------------
-  let lang = "ko";
-  try { lang = localStorage.getItem("daperzip.lang") || ""; } catch (_) { lang = ""; }
-  if (lang !== "ko" && lang !== "en") lang = /^ko\b/i.test(navigator.language || "") ? "ko" : "en";
-
-  document.querySelectorAll("[data-i18n]").forEach((el) => (KO[el.dataset.i18n] = el.textContent));
-
-  function applyLang() {
-    document.documentElement.lang = lang;
-    document.querySelectorAll("[data-i18n]").forEach((el) => {
-      const k = el.dataset.i18n;
-      el.textContent = lang === "en" ? EN[k] || KO[k] : KO[k];
-    });
-    document.getElementById("lang").textContent = lang === "en" ? "한국어" : "EN";
-    document.getElementById("hero-shot").src = `assets/screenshot-${lang}.png`;
-    render();
-  }
-  document.getElementById("lang").addEventListener("click", () => {
-    lang = lang === "en" ? "ko" : "en";
-    try { localStorage.setItem("daperzip.lang", lang); } catch (_) {}
-    applyLang();
-  });
-
+  // Each language is its own static page (/ = ko, /en/ = en) so search engines
+  // can index both. The page language comes from <html lang>.
+  const lang = document.documentElement.lang === "en" ? "en" : "ko";
   // ---------------- platform ----------------
   function detectOS() {
     const ua = navigator.userAgent || "";
@@ -150,6 +131,5 @@
     render();
   }
 
-  applyLang();
   load();
 })();

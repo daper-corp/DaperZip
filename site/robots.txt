@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://daper-corp.github.io/DaperZip/sitemap.xml
