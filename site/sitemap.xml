@@ -12,4 +12,16 @@
     <xhtml:link rel="alternate" hreflang="ko" href="https://zip.dapercorp.com/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://zip.dapercorp.com/en/"/>
   </url>
+  <url>
+    <loc>https://zip.dapercorp.com/privacy/</loc>
+    <lastmod>2026-11-05</lastmod>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zip.dapercorp.com/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zip.dapercorp.com/en/privacy/"/>
+  </url>
+  <url>
+    <loc>https://zip.dapercorp.com/en/privacy/</loc>
+    <lastmod>2026-11-05</lastmod>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zip.dapercorp.com/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zip.dapercorp.com/en/privacy/"/>
+  </url>
 </urlset>

@@ -159,6 +159,10 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # Checksums so users can verify downloads (sha256sum -c SHA256SUMS).
+      - name: Create SHA256SUMS
+        run: cd dist && sha256sum * > SHA256SUMS
+
       # New version on main: create tag v<version> on this commit and publish.
       - name: Create release
         if: needs.version.outputs.release == 'true'

@@ -3,28 +3,7 @@
   const REPO = "daper-corp/DaperZip";
   const RELEASES = `https://github.com/${REPO}/releases`;
 
-  const EN = {
-    "nav.features": "Features", "nav.download": "Download", "nav.install": "Install",
-    "hero.badge": "Beta", "hero.title": "Archives, made easy",
-    "hero.lead": "DaperZip is a file archiver for Windows, macOS and Linux. Compression is handled by the 7-Zip engine.",
-    "dl.loading": "Download", "dl.other": "Other platforms",
-    "features.title": "Features",
-    "f1.t": "Most archive formats", "f1.d": "Open and extract ZIP, 7Z, RAR, TAR, GZ, XZ, ISO, CAB, WIM, LZH and everything else 7-Zip reads.",
-    "f2.t": "Smart extract", "f2.d": "One item goes right next to the archive; several items get a folder named after it.",
-    "f3.t": "Explorer right-click menu", "f3.d": "Extract and compress right from Windows Explorer. Multi-selection becomes one job.",
-    "f4.t": "File names stay intact", "f4.d": "Fixes decomposed names from macOS archives and legacy Windows code-page (CP949) ZIPs automatically.",
-    "f5.t": "Passwords and split volumes", "f5.d": "ZIP AES-256, encrypted 7Z file names, split archives (CD, 4 GB and more).",
-    "f6.t": "Edit archives in place", "f6.d": "Add, delete, rename, drag and drop. Edit a file inside an archive and save it back.",
-    "download.title": "Download", "download.all": "Older versions and release notes",
-    "install.title": "Installation",
-    "install.win1": "The installer lets you install for yourself (no admin rights) or for all users. It adds the Explorer right-click menu; on Windows 11 it is under \"Show more options\".",
-    "install.win2": "If \"Windows protected your PC\" appears, click \"More info\" → \"Run anyway\". Code signing is in progress.",
-    "install.mac1": "Open the dmg and drag DaperZip to Applications.",
-    "install.mac2": "If macOS warns on first launch, right-click DaperZip in Finder and choose \"Open\".",
-    "install.linux1": "Install the .deb on Debian/Ubuntu. On other distributions make the AppImage executable and run it.",
-    "foot.license": "DaperZip is open source under the MIT license.",
-    "foot.7zip": "Compression engine: 7-Zip by Igor Pavlov (GNU LGPL + unRAR restriction). DaperZip is a separate project from 7-Zip.",
-  };
+  const EN = { "dl.loading": "Download" };
   const KO = { "dl.loading": "다운로드" };
   const T = {
     ko: { forOs: (os) => `${os}용 다운로드`, installer: "설치 프로그램", portable: "포터블 (압축만 풀면 실행)", dmg: "디스크 이미지 (.dmg)", deb: "Debian / Ubuntu (.deb)", appimage: "AppImage (모든 배포판)", released: (v, d) => `최신 버전 ${v} · ${d}`, pre: "베타", unavailable: "아직 파일이 없습니다. GitHub 릴리스 페이지에서 확인하세요.", mobile: "DaperZip은 PC용 프로그램입니다. 아래에서 운영체제별 파일을 받을 수 있습니다.", alsoPortable: "설치 없이 쓰려면", portableLink: "포터블 버전" },
@@ -132,4 +111,16 @@
   }
 
   load();
+
+  // Offer the English page to English-speaking visitors (no automatic redirect: crawlers must see both).
+  (function banner() {
+    const el = document.getElementById("lang-banner");
+    if (!el || lang !== "ko" || !location.pathname.replace(/index\.html$/, "").match(/^\/?$/)) return;
+    if (/^ko\b/i.test(navigator.language || "") || !/^en\b/i.test(navigator.language || "")) return;
+    try { if (localStorage.getItem("daperzip.banner") === "off") return; } catch (_) {}
+    const a = document.createElement("a"); a.href = "en/"; a.textContent = "View in English";
+    const x = document.createElement("button"); x.type = "button"; x.textContent = "\u2715"; x.setAttribute("aria-label", "Close");
+    x.onclick = () => { el.hidden = true; try { localStorage.setItem("daperzip.banner", "off"); } catch (_) {} };
+    el.append("This page is in Korean.", a, x); el.hidden = false;
+  })();
 })();
