@@ -486,8 +486,9 @@ end;
 // and silent, and wait for it; this window shows progress meanwhile.
 function InstallElevated: Boolean;
 var
-  Params: String;
+  Params, ElevatedExe: String;
   Code: Integer;
+  Copied, Launched: Boolean;
 begin
   Result := False;
   ErrorText.Caption := '';
@@ -495,9 +496,37 @@ begin
   StatusText.Visible := True;
   Marquee.Visible := True;
   WizardForm.Refresh;
+
+  // A setup started from Downloads or a per-user Temp folder is often not
+  // readable by the administrator account UAC switches to, which makes
+  // ShellExec('runas') fail. Keep the copy in a location both accounts can
+  // read, owned by this user so other standard users cannot modify it.
+  Copied := False;
+  ElevatedExe := ExpandConstant('{srcexe}');
+  if ForceDirectories(ExpandConstant('{commonappdata}\{#AppName}\{username}')) then
+  begin
+    if FileCopy(ElevatedExe,
+      ExpandConstant('{commonappdata}\{#AppName}\{username}\DaperZipSetup.exe'), False) then
+    begin
+      ElevatedExe := ExpandConstant('{commonappdata}\{#AppName}\{username}\DaperZipSetup.exe');
+      Copied := True;
+    end;
+  end;
+
   Params := '/ALLUSERS /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /LANG=' + ActiveLanguage +
     ' /DIR="' + DirEdit.Text + '" /TASKS="' + TaskList + '"';
-  if not ShellExec('runas', ExpandConstant('{srcexe}'), Params, '', SW_SHOWNORMAL, ewWaitUntilTerminated, Code) then
+
+  // If this setup was already started as administrator, run the /ALLUSERS
+  // copy with the same token instead of asking UAC to elevate it again.
+  if IsAdmin then
+    Launched := Exec(ElevatedExe, Params, '', SW_SHOWNORMAL, ewWaitUntilTerminated, Code)
+  else
+    Launched := ShellExec('runas', ElevatedExe, Params, '', SW_SHOWNORMAL, ewWaitUntilTerminated, Code);
+
+  if Copied then
+    DeleteFile(ElevatedExe);
+
+  if not Launched then
   begin
     ErrorText.Caption := CustomMessage('NeedAdmin');
     // Fall back to a per-user install: it needs no administrator rights, so
