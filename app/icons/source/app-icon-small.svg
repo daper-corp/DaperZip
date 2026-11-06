@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" shape-rendering="crispEdges">
+  <!-- DaperZip app icon pixel-fitted for exactly 32x32 (one unit = one pixel). -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFC04A"/>
+      <stop offset="1" stop-color="#F0960C"/>
+    </linearGradient>
+    <clipPath id="clip"><rect width="32" height="32" rx="7"/></clipPath>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="url(#tile)" shape-rendering="geometricPrecision"/>
+  <g clip-path="url(#clip)">
+    <rect x="11" y="0" width="10" height="32" fill="#000000" opacity=".12"/>
+    <g fill="#111318">
+      <rect x="11" y="0" width="5" height="1"/>
+      <rect x="16" y="2" width="5" height="1"/>
+      <rect x="11" y="4" width="5" height="1"/>
+      <rect x="16" y="6" width="5" height="1"/>
+      <rect x="11" y="8" width="5" height="1"/>
+      <rect x="16" y="10" width="5" height="1"/>
+      <rect x="11" y="12" width="5" height="1"/>
+      <rect x="16" y="14" width="5" height="1"/>
+      <rect x="16" y="30" width="5" height="1"/>
+    </g>
+    <rect x="10" y="15" width="12" height="2" fill="#FFFFFF"/>
+    <rect x="11" y="17" width="10" height="2" fill="#FFFFFF"/>
+    <rect x="12" y="18" width="8" height="10" fill="#FFFFFF"/>
+    <rect x="15" y="22" width="2" height="4" fill="#111318"/>
+  </g>
+</svg>

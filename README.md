@@ -95,6 +95,12 @@ cd app && npx @tauri-apps/cli@2 build
 
 `main` 브랜치에 push하면 GitHub Actions가 세 운영체제용 빌드를 모두 만듭니다.
 
+### 앱 아이콘
+
+앱 아이콘의 원본은 `app/icons/source/`의 SVG입니다. 큰 크기용(`app-icon.svg`)과 16/24/32px용으로 픽셀을 맞춘 버전이
+따로 있습니다. 원본을 고친 뒤 `node scripts/build-icons.mjs`를 실행하면 앱(`app/icons/`), 웹사이트 파비콘,
+설치 프로그램 로고가 모두 다시 만들어집니다(ImageMagick 7 필요). 회사 로고(`daper-mark.png`)와는 별개의 파일입니다.
+
 ### 릴리스
 
 ```bash
@@ -114,7 +120,7 @@ app/                  Tauri 앱: 창 관리, 백그라운드 작업, 명령줄(�
                       단일 인스턴스, Windows 레지스트리 통합, 설정
 ui/                   화면(HTML/CSS/JS, 빌드 도구 없음)
 vendor/7zip/           내장된 공식 7-Zip 실행 파일 (Windows/macOS/Linux)
-scripts/              7-Zip 버전 업데이트
+scripts/              7-Zip 버전 업데이트, 버전 올리기, 웹사이트·아이콘 생성
 ```
 
 DaperZip은 압축 알고리즘을 직접 구현하지 않습니다. 모든 작업은 별도 프로세스로 실행되는

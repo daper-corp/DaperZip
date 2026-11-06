@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- DaperZip app icon (48 px and up). Amber tile = UI accent #F5A524,
+       ink #111318 = Daper company mark. Edit, then: node scripts/build-icons.mjs -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFC04A"/>
+      <stop offset="1" stop-color="#F0960C"/>
+    </linearGradient>
+    <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
+    <clipPath id="clip">
+      <rect x="64" y="64" width="896" height="896" rx="200"/>
+    </clipPath>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#tile)"/>
+  <g clip-path="url(#clip)">
+    <!-- zipper tape -->
+    <rect x="404" y="40" width="216" height="960" fill="#000000" opacity=".10"/>
+    <!-- teeth -->
+    <g fill="#111318">
+    <rect x="434" y="30" width="112" height="40" rx="20"/>
+    <rect x="478" y="82" width="112" height="40" rx="20"/>
+    <rect x="434" y="134" width="112" height="40" rx="20"/>
+    <rect x="478" y="186" width="112" height="40" rx="20"/>
+    <rect x="434" y="238" width="112" height="40" rx="20"/>
+    <rect x="478" y="290" width="112" height="40" rx="20"/>
+    <rect x="434" y="342" width="112" height="40" rx="20"/>
+    <rect x="478" y="394" width="112" height="40" rx="20"/>
+    <rect x="434" y="446" width="112" height="40" rx="20"/>
+    <rect x="478" y="498" width="112" height="40" rx="20"/>
+    <rect x="434" y="550" width="112" height="40" rx="20"/>
+    <rect x="478" y="602" width="112" height="40" rx="20"/>
+    <rect x="434" y="654" width="112" height="40" rx="20"/>
+    <rect x="478" y="706" width="112" height="40" rx="20"/>
+    <rect x="434" y="758" width="112" height="40" rx="20"/>
+    <rect x="478" y="810" width="112" height="40" rx="20"/>
+    <rect x="434" y="862" width="112" height="40" rx="20"/>
+    <rect x="478" y="914" width="112" height="40" rx="20"/>
+    <rect x="434" y="966" width="112" height="40" rx="20"/>
+    </g>
+  </g>
+  <!-- slider: pull tab shadow, pull tab, head, hinge, slot -->
+  <rect x="452" y="590" width="120" height="262" rx="60" fill="#000000" opacity=".22" filter="url(#blur)"/>
+  <rect x="452" y="576" width="120" height="262" rx="60" fill="#FFFFFF"/>
+  <path d="M451 468 H573 Q606 468 606 501 C606 551 556 573 556 618 H468 C468 573 418 551 418 501 Q418 468 451 468 Z" fill="#FFFFFF"/>
+  <rect x="476" y="580" width="72" height="10" rx="5" fill="#E3E5EA"/>
+  <rect x="493" y="700" width="38" height="88" rx="19" fill="#111318"/>
+</svg>

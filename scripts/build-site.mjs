@@ -156,10 +156,10 @@ function head(l, { title, desc, url, other, withApp, faq, noindexAlt }) {
     mainEntity: faq.map(([q, a]) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } })),
   });
   const p = t.prefix;
-  h += `  <link rel="icon" href="${p}favicon.ico?v=2" sizes="48x48">
-  <link rel="icon" type="image/png" sizes="32x32" href="${p}assets/favicon-32.png?v=2">
-  <link rel="icon" type="image/png" sizes="16x16" href="${p}assets/favicon-16.png?v=2">
-  <link rel="apple-touch-icon" href="${p}assets/apple-touch-icon.png?v=2">
+  h += `  <link rel="icon" href="${p}favicon.ico?v=3" sizes="48x48">
+  <link rel="icon" type="image/png" sizes="32x32" href="${p}assets/favicon-32.png?v=3">
+  <link rel="icon" type="image/png" sizes="16x16" href="${p}assets/favicon-16.png?v=3">
+  <link rel="apple-touch-icon" href="${p}assets/apple-touch-icon.png?v=3">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link rel="stylesheet" href="${p}style.css">
