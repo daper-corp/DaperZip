@@ -1,0 +1,32 @@
+name: Winget
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g. v0.1.3)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+    steps:
+      # The first version must be merged into microsoft/winget-pkgs manually;
+      # winget-releaser updates an existing package from that base.
+      - name: Submit update to winget-pkgs
+        if: env.WINGET_TOKEN != ''
+        uses: vedantmgoyal9/winget-releaser@main
+        with:
+          identifier: DaperCorp.DaperZip
+          installers-regex: 'DaperZip_.*_x64-setup\.exe$'
+          release-tag: ${{ github.event.release.tag_name || inputs.tag }}
+          fork-user: ${{ vars.WINGET_FORK_USER || github.repository_owner }}
+          token: ${{ env.WINGET_TOKEN }}
