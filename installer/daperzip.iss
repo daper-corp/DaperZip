@@ -42,7 +42,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 WizardStyle=modern
-WizardSizePercent=115,125
+WizardSizePercent=115,113
 SetupIconFile={#Root}\app\icons\icon.ico
 UninstallDisplayIcon={app}\{#AppExe}
 UninstallDisplayName={#AppName}
@@ -354,7 +354,8 @@ procedure ShowDone(const AppDir: String); forward;
 // Our buttons live in the wizard's bottom strip, where Next/Cancel were.
 function StripMargin: Integer;
 begin
-  Result := WizardForm.ClientWidth - (WizardForm.CancelButton.Left + WizardForm.CancelButton.Width);
+  // same side margin as the page content
+  Result := ScaleX(32);
 end;
 
 function StripTop(H: Integer): Integer;
