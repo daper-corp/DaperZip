@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+    # website / docs-only changes don't need an app build
+    paths-ignore: ["site/**", "docs/**", "**/*.md", ".github/workflows/pages.yml"]
   pull_request:
   workflow_dispatch:
     inputs:
