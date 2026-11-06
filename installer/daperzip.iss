@@ -543,18 +543,24 @@ begin
       WizardForm.FinishedPage.ClientHeight - ScaleY(64), ScaleX(170), ScaleY(42), @LaunchClick, LaunchBtnLabel);
 end;
 
+var
+  NextLeft: Integer;
+
 procedure CurPageChanged(CurPageID: Integer);
 begin
-  // Our page has its own button; the native ones are only used on the
-  // progress page (Cancel) and the finished page (Close).
+  // Silent installs drive the wizard through the Next button, so it must
+  // stay visible and enabled; with our own screens it is only moved away.
+  if WizardSilent then exit;
+  if NextLeft = 0 then NextLeft := WizardForm.NextButton.Left;
   WizardForm.BackButton.Visible := False;
-  WizardForm.NextButton.Visible := CurPageID = wpFinished;
   WizardForm.CancelButton.Visible := CurPageID = wpInstalling;
   if CurPageID = wpFinished then
   begin
     WizardForm.NextButton.Caption := CustomMessage('Close');
     WizardForm.NextButton.Left := ScaleX(32);
-  end;
+  end
+  else
+    WizardForm.NextButton.Left := -ScaleX(2000);
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
