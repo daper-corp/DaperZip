@@ -267,6 +267,8 @@ jobs:
       - uses: actions/download-artifact@v7
         with:
           path: dist
+          # installers only (not e.g. the installer-screenshots artifact)
+          pattern: daperzip-*
           merge-multiple: true
 
       # Checksums so users can verify downloads (sha256sum -c SHA256SUMS).
