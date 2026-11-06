@@ -58,6 +58,22 @@ Windows 설치 프로그램에서 **나만 사용**(관리자 권한 불필요) 
 설치하면 탐색기 오른쪽 클릭 메뉴가 자동으로 추가됩니다(설정에서 끌 수 있음).
 Windows 11에서는 메뉴가 *추가 옵션 표시* 안에 나타납니다.
 
+### 터미널 설치
+
+- **Windows**: `winget install DaperCorp.DaperZip` (winget-pkgs 등록 검토 중)
+- **macOS · Linux**: 릴리스의 `SHA256SUMS`로 검증하는 설치 스크립트
+
+  ```sh
+  curl -fsSL https://zip.dapercorp.com/install.sh | sh
+  ```
+
+  curl로 받으면 macOS 격리 표시가 붙지 않아 첫 실행 경고 없이 실행됩니다.
+  그래도 경고가 나오면 `--no-quarantine`을 명시하세요.
+
+  ```sh
+  curl -fsSL https://zip.dapercorp.com/install.sh | sh -s -- --no-quarantine
+  ```
+
 ## 직접 빌드하기
 
 필요한 것: [Rust](https://rustup.rs), Node.js 18 이상(Tauri CLI 실행용), [Tauri 사전 요구 사항](https://tauri.app/start/prerequisites/)

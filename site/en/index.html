@@ -226,6 +226,14 @@
             <p>Install the .deb on Debian/Ubuntu. On other distributions make the AppImage executable and run it.</p>
             <pre><code>chmod +x DaperZip_*.AppImage</code></pre>
           </article>
+          <article>
+            <h3>Terminal install</h3>
+            <p>Windows: <code>winget install DaperCorp.DaperZip</code> (under review in winget-pkgs).</p>
+            <p>macOS and Linux: the installer script verifies files against the release's SHA256SUMS. A curl download carries no macOS quarantine flag, so the app launches without a Gatekeeper warning.</p>
+            <pre><code>curl -fsSL https://zip.dapercorp.com/install.sh | sh</code></pre>
+            <p>If macOS still blocks it, add <code>--no-quarantine</code>.</p>
+            <pre><code>curl -fsSL https://zip.dapercorp.com/install.sh | sh -s -- --no-quarantine</code></pre>
+          </article>
         </div>
       </div>
     </section>
