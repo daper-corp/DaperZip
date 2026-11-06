@@ -135,6 +135,11 @@ Source: "logo-104.bmp"; Flags: dontcopy
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
+; A friendly name for the uninstaller; the raw unins000.* files are hidden.
+Name: "{autoprograms}\DaperZip 제거"; Filename: "{uninstallexe}"; IconFilename: "{app}\{#AppExe}"; Languages: ko
+Name: "{autoprograms}\Uninstall DaperZip"; Filename: "{uninstallexe}"; IconFilename: "{app}\{#AppExe}"; Languages: en
+Name: "{app}\DaperZip 제거"; Filename: "{uninstallexe}"; IconFilename: "{app}\{#AppExe}"; Languages: ko
+Name: "{app}\Uninstall DaperZip"; Filename: "{uninstallexe}"; IconFilename: "{app}\{#AppExe}"; Languages: en
 
 [Run]
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "WebView2"; Flags: waituntilterminated; Check: NeedsWebView2
@@ -145,6 +150,9 @@ Filename: "{app}\{#AppExe}"; Parameters: "--register-assoc"; Flags: runhidden wa
 ; The app registers the menu for this user (per-user install) or for
 ; everyone (Program Files install).
 Filename: "{app}\{#AppExe}"; Parameters: "--register-shell"; Flags: runhidden waituntilterminated; Tasks: contextmenu
+; Keep Inno's uninstaller files in place (upgrades need them) but hide the
+; cryptic unins000.* names; the "DaperZip 제거" shortcut points to them.
+Filename: "{cmd}"; Parameters: "/C attrib +h ""{app}\unins???.exe"" 2>nul & attrib +h ""{app}\unins???.dat"" 2>nul & attrib +h ""{app}\unins???.msg"" 2>nul & exit /b 0"; Flags: runhidden waituntilterminated
 ; After an update started from the app, bring the app back.
 Filename: "{app}\{#AppExe}"; Flags: nowait runasoriginaluser; Check: IsUpdate
 

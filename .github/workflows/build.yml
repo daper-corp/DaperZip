@@ -243,12 +243,12 @@ jobs:
           $setup = (Get-ChildItem dist\DaperZip_*_x64-setup.exe).FullName
           function Check($cond, $msg) { if (-not $cond) { throw $msg } ; Write-Host "OK  $msg" }
           $cases = @(
-            @{ Flag = '/CURRENTUSER'; Dir = "$env:LOCALAPPDATA\Programs\DaperZip"; Hive = 'HKCU:' },
-            @{ Flag = '/ALLUSERS';    Dir = "$env:ProgramFiles\DaperZip";          Hive = 'HKLM:' }
+            @{ Flag = '/CURRENTUSER'; Dir = "$env:LOCALAPPDATA\Programs\DaperZip"; Hive = 'HKCU:'; Menu = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" },
+            @{ Flag = '/ALLUSERS';    Dir = "$env:ProgramFiles\DaperZip";          Hive = 'HKLM:'; Menu = "$env:ProgramData\Microsoft\Windows\Start Menu\Programs" }
           )
           foreach ($c in $cases) {
             $log = "$env:RUNNER_TEMP\setup$($c.Flag.Trim('/')).log"
-            $p = Start-Process $setup -ArgumentList "$($c.Flag) /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /TASKS=contextmenu,desktopicon /LOG=`"$log`"" -Wait -PassThru
+            $p = Start-Process $setup -ArgumentList "$($c.Flag) /LANG=en /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /TASKS=contextmenu,desktopicon /LOG=`"$log`"" -Wait -PassThru
             if ($p.ExitCode -ne 0) { Write-Host "setup exit code: $($p.ExitCode)"; if (Test-Path $log) { Get-Content $log | Select-Object -Last 60 } }
             Check ($p.ExitCode -eq 0) "$($c.Flag): setup exit code 0"
             Check (Test-Path "$($c.Dir)\DaperZip.exe") "$($c.Flag): DaperZip.exe installed in $($c.Dir)"
@@ -256,10 +256,19 @@ jobs:
             $cmd = (Get-ItemProperty "$($c.Hive)\Software\Classes\SystemFileAssociations\.zip\shell\DaperZip.Extract\shell\1smart\command").'(default)'
             Check ($cmd -like "*$($c.Dir)\DaperZip.exe*") "$($c.Flag): right-click menu points to the installed exe"
             Check (Test-Path "$($c.Hive)\Software\Microsoft\Windows\CurrentVersion\Uninstall\{13371C5E-DE99-47B0-8A62-96AC45691B98}_is1") "$($c.Flag): listed in Apps & features"
+            Check (Test-Path "$($c.Dir)\Uninstall DaperZip.lnk") "$($c.Flag): friendly uninstall shortcut in the install folder"
+            Check (Test-Path "$($c.Menu)\Uninstall DaperZip.lnk") "$($c.Flag): friendly uninstall shortcut in the Start menu"
+            $hidden = [IO.FileAttributes]::Hidden
+            Check (((Get-Item -Force "$($c.Dir)\unins000.exe").Attributes -band $hidden) -ne 0) "$($c.Flag): uninstaller exe hidden"
+            Check (((Get-Item -Force "$($c.Dir)\unins000.dat").Attributes -band $hidden) -ne 0) "$($c.Flag): uninstaller data hidden"
             $p = Start-Process "$($c.Dir)\unins000.exe" -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -Wait -PassThru
             Start-Sleep -Seconds 3
             Check (-not (Test-Path "$($c.Dir)\DaperZip.exe")) "$($c.Flag): files removed by uninstall"
-            Check (-not (Test-Path -LiteralPath "$($c.Hive)\Software\Classes\*\shell\DaperZip.Compress")) "$($c.Flag): right-click menu removed by uninstall"
+            foreach ($base in '*', 'Directory') {
+              Check (-not (Test-Path -LiteralPath "$($c.Hive)\Software\Classes\$base\shell\DaperZip.Compress")) "$($c.Flag): right-click menu removed by uninstall ($base)"
+            }
+            Check (-not (Test-Path "$($c.Dir)\Uninstall DaperZip.lnk")) "$($c.Flag): install-folder uninstall shortcut removed"
+            Check (-not (Test-Path "$($c.Menu)\Uninstall DaperZip.lnk")) "$($c.Flag): Start menu uninstall shortcut removed"
           }
 
       - name: Screenshot Windows installer
