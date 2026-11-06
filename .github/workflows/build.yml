@@ -139,6 +139,36 @@ jobs:
           export DAPERZIP_7Z="$PWD/vendor/7zip/${{ matrix.sevenzip }}/$([ "$RUNNER_OS" = "Windows" ] && echo 7z.exe || echo 7zz)"
           cargo test -p daperzip-core
 
+      # macOS: sign and notarize when these repository secrets exist.
+      # Without them the DMG is unsigned and Gatekeeper blocks the app.
+      - name: Configure macOS signing
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "::warning::APPLE_CERTIFICATE is not set; the macOS app will be unsigned and Gatekeeper will block it."
+            exit 0
+          fi
+          for pair in \
+            "APPLE_CERTIFICATE=$APPLE_CERTIFICATE" \
+            "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD" \
+            "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY" \
+            "APPLE_ID=$APPLE_ID" \
+            "APPLE_PASSWORD=$APPLE_PASSWORD" \
+            "APPLE_TEAM_ID=$APPLE_TEAM_ID"; do
+            name="${pair%%=*}"
+            value="${pair#*=}"
+            if [ -n "$value" ]; then
+              printf '%s=%s\n' "$name" "$value" >> "$GITHUB_ENV"
+            fi
+          done
+
       - name: Build app
         working-directory: app
         run: npx -y @tauri-apps/cli@2 build ${{ matrix.args }}

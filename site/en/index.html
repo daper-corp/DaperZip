@@ -218,7 +218,8 @@
           <article>
             <h3>macOS</h3>
             <p>Open the dmg and drag DaperZip to Applications.</p>
-            <p>If macOS warns on first launch, right-click DaperZip in Finder and choose "Open".</p>
+            <p>The app is not notarized yet, so macOS warns on first launch. On macOS 14 or earlier, right-click DaperZip in Finder and choose "Open". On macOS 15 or later, open <strong>System Settings → Privacy &amp; Security</strong> and click <strong>"Open Anyway"</strong> for DaperZip.</p>
+            <p>In Terminal you can also clear the quarantine flag: <code>xattr -dr com.apple.quarantine /Applications/DaperZip.app</code></p>
           </article>
           <article>
             <h3>Linux</h3>
@@ -236,7 +237,7 @@
         <details><summary>How is it different from 7-Zip?</summary><p>Compression is done by the 7-Zip engine. DaperZip is a separate project that adds convenience on top: automatic fixes for Korean file names, smart extract, editing inside archives and an Explorer right-click menu.</p></details>
         <details><summary>Can it open RAR files?</summary><p>Yes, it can open and extract RAR. It cannot create new RAR archives; for new archives you can choose ZIP, 7Z, TAR variants or WIM.</p></details>
         <details><summary>Korean file names in my archive look garbled.</summary><p>DaperZip detects decomposed Hangul from macOS archives and legacy Windows (CP949) ZIP names and fixes them automatically. You can also pick the ZIP file name encoding in Settings.</p></details>
-        <details><summary>I get a warning when installing.</summary><p>The installers are not code-signed yet, so Windows and macOS show a warning on first launch. Follow the installation steps above. Releases include SHA256SUMS so you can verify the files.</p></details>
+        <details><summary>I get a warning when installing.</summary><p>The installers are not code-signed yet, so Windows and macOS show a warning on first launch. On Windows click "More info" → "Run anyway". On macOS 14 or earlier, right-click the app and choose "Open"; on macOS 15 or later, use System Settings → Privacy &amp; Security → "Open Anyway". Releases include SHA256SUMS so you can verify the files.</p></details>
         <details><summary>Does it collect any data?</summary><p>No. Compression and extraction happen on your computer, and no files or usage data are sent anywhere. On start it checks GitHub for a newer version, which you can turn off in Settings. See the privacy notice for details.</p></details>
         <details><summary>Which systems are supported?</summary><p>Windows 10 / 11 (x64), macOS 10.15 or later (Apple Silicon and Intel), and Linux x64 (deb and AppImage).</p></details>
       </div>

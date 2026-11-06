@@ -96,8 +96,8 @@ ko.Launch=DaperZip 실행
 en.Launch=Open DaperZip
 ko.Close=닫기
 en.Close=Close
-ko.NeedAdmin=관리자 권한이 없어 모든 사용자용으로 설치하지 못했습니다. "나만 사용"으로 설치할 수 있습니다.
-en.NeedAdmin=Administrator rights were not granted. You can install for "Just me" instead.
+ko.NeedAdmin=관리자 권한을 얻지 못했습니다. "나만 사용"으로 전환했습니다. 설치를 다시 눌러 주세요.
+en.NeedAdmin=Administrator rights were not granted. Switched to "Just me" — click Install again.
 ko.Failed=설치하지 못했습니다 (코드 %1).
 en.Failed=Installation failed (code %1).
 ko.Browse=설치할 폴더를 고르세요.
@@ -145,6 +145,11 @@ const
   Ink = $30221C;         // #1C2230
   Muted = $85736B;       // #6B7385
   Line = $E1D6CF;        // #CFD6E1
+  TOKEN_QUERY = $0008;
+  TokenElevationType = 18;
+  TokenElevation = 20;
+  DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+  DWMWCP_ROUND = 2;
 
 var
   OptionsPage: TWizardPage;
@@ -160,6 +165,27 @@ var
   FooterText: TNewStaticText;
   StatusText, ErrorText: TNewStaticText;
   Marquee: TNewProgressBar;
+
+// ---------------------------------------------------------------- win32
+
+function OpenProcessToken(ProcessHandle: THandle; DesiredAccess: Cardinal;
+  var TokenHandle: THandle): Boolean;
+  external 'OpenProcessToken@advapi32.dll stdcall';
+function GetCurrentProcess: THandle;
+  external 'GetCurrentProcess@kernel32.dll stdcall';
+function GetTokenInformation(TokenHandle: THandle; TokenInformationClass: Integer;
+  var TokenInformation: Integer; TokenInformationLength: Cardinal;
+  var ReturnLength: Cardinal): Boolean;
+  external 'GetTokenInformation@advapi32.dll stdcall';
+function CloseHandle(hObject: THandle): Boolean;
+  external 'CloseHandle@kernel32.dll stdcall';
+function CreateRoundRectRgn(X1, Y1, X2, Y2, W, H: Integer): Integer;
+  external 'CreateRoundRectRgn@gdi32.dll stdcall';
+function SetWindowRgn(hWnd: HWND; hRgn: Integer; bRedraw: Integer): Integer;
+  external 'SetWindowRgn@user32.dll stdcall';
+function DwmSetWindowAttribute(hwnd: HWND; dwAttribute: Cardinal;
+  var pvAttribute: Integer; cbAttribute: Cardinal): Integer;
+  external 'DwmSetWindowAttribute@dwmapi.dll stdcall';
 
 // ---------------------------------------------------------------- helpers
 
@@ -209,6 +235,55 @@ begin
   Result := FileExists(AddBackslash(Dir) + 'uninstall.exe');
 end;
 
+// True when this account can elevate (is an administrator), even though this
+// Setup process runs non-elevated because PrivilegesRequired=lowest.
+function CanElevate: Boolean;
+var
+  Token: THandle;
+  Kind, Elevated: Integer;
+  Len: Cardinal;
+begin
+  Result := False;
+  Token := 0;
+  if not OpenProcessToken(GetCurrentProcess, TOKEN_QUERY, Token) then
+    Exit;
+  Kind := 0;
+  Len := 0;
+  if GetTokenInformation(Token, TokenElevationType, Kind, SizeOf(Kind), Len) then
+  begin
+    // 2 = full token, 3 = filtered admin token (can elevate)
+    if (Kind = 2) or (Kind = 3) then
+      Result := True
+    else if Kind = 1 then
+    begin
+      // UAC disabled: a full token is already elevated.
+      Elevated := 0;
+      if GetTokenInformation(Token, TokenElevation, Elevated, SizeOf(Elevated), Len) then
+        Result := Elevated <> 0;
+    end;
+  end;
+  CloseHandle(Token);
+end;
+
+// Clip a control to a rounded rectangle. The corners become transparent to
+// the white form background, giving the flat controls a rounded look.
+procedure RoundControl(C: TWinControl; Radius: Integer);
+begin
+  if (C <> nil) and (C.Width > 0) and (C.Height > 0) then
+    SetWindowRgn(C.Handle,
+      CreateRoundRectRgn(0, 0, C.Width + 1, C.Height + 1, Radius, Radius), 1);
+end;
+
+// Windows 11 rounded window corners; harmless on Windows 10.
+procedure RoundWindow;
+var
+  Pref: Integer;
+begin
+  Pref := DWMWCP_ROUND;
+  DwmSetWindowAttribute(WizardForm.Handle, DWMWA_WINDOW_CORNER_PREFERENCE,
+    Pref, SizeOf(Pref));
+end;
+
 // The scope an existing DaperZip was installed in. Updates must follow it:
 // defaulting a per-user 0.1.0 (NSIS) install to "all users" makes Setup ask
 // for admin rights, which fails for a standard user and lands on NeedAdmin.
@@ -227,7 +302,7 @@ begin
   else if RegKeyExists(HKCU, NsisUninstKey) then
     Result := False
   else
-    Result := True; // fresh install: all users (recommended)
+    Result := CanElevate; // fresh install: all users only if we can elevate
 end;
 
 function NewLabel(Parent: TWinControl; const Text: String; X, Y, W: Integer;
@@ -258,6 +333,7 @@ begin
   Result.Color := Accent;
   Result.Cursor := crHand;
   Result.OnClick := OnClick;
+  RoundControl(Result, ScaleY(10));
   Lbl := TLabel.Create(WizardForm);
   Lbl.Parent := Result;
   Lbl.AutoSize := False;
@@ -339,6 +415,7 @@ begin
   Result.Color := clWhite;
   Result.Cursor := crHand;
   Result.OnClick := @ScopeClick;
+  RoundControl(Result, ScaleY(10));
   Radio := TNewRadioButton.Create(WizardForm);
   Radio.Parent := Result;
   Radio.SetBounds(ScaleX(12), ScaleY(8), W - ScaleX(20), ScaleY(20));
@@ -421,7 +498,15 @@ begin
   Params := '/ALLUSERS /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /LANG=' + ActiveLanguage +
     ' /DIR="' + DirEdit.Text + '" /TASKS="' + TaskList + '"';
   if not ShellExec('runas', ExpandConstant('{srcexe}'), Params, '', SW_SHOWNORMAL, ewWaitUntilTerminated, Code) then
-    ErrorText.Caption := CustomMessage('NeedAdmin')
+  begin
+    ErrorText.Caption := CustomMessage('NeedAdmin');
+    // Fall back to a per-user install: it needs no administrator rights, so
+    // the next Install click succeeds even on a standard account.
+    ScopeAll.Checked := False;
+    ScopeMe.Checked := True;
+    DirTouched := False;
+    PaintScope;
+  end
   else if Code <> 0 then
     ErrorText.Caption := FmtMessage(CustomMessage('Failed'), [IntToStr(Code)])
   else
@@ -436,6 +521,7 @@ end;
 
 procedure InstallClick(Sender: TObject);
 begin
+  ErrorText.Caption := '';
   if ScopeAll.Checked and not IsAdminInstallMode then
   begin
     InstallElevated;
@@ -519,11 +605,13 @@ begin
   DirEdit.Parent := S;
   DirEdit.SetBounds(X, Y, W - 2 * X - ScaleX(90), ScaleY(26));
   DirEdit.OnChange := @DirEditChange;
+  RoundControl(DirEdit, ScaleY(8));
   Browse := TNewButton.Create(WizardForm);
   Browse.Parent := S;
   Browse.Caption := CustomMessage('Change');
   Browse.SetBounds(W - X - ScaleX(80), Y - ScaleY(1), ScaleX(80), ScaleY(28));
   Browse.OnClick := @BrowseClick;
+  RoundControl(Browse, ScaleY(8));
 
   Y := Y + ScaleY(40);
   MenuCheck := TNewCheckBox.Create(WizardForm);
@@ -563,6 +651,7 @@ end;
 procedure InitializeWizard;
 begin
   WizardForm.Caption := CustomMessage('SetupTitle');
+  RoundWindow;
   WizardForm.Color := clWhite;
   // Hide the classic wizard chrome: header strip, separators.
   WizardForm.MainPanel.Visible := False;

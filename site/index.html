@@ -218,7 +218,8 @@
           <article>
             <h3>macOS</h3>
             <p>dmg를 열고 DaperZip을 응용 프로그램 폴더로 끌어 놓으세요.</p>
-            <p>처음 실행할 때 경고가 나오면 Finder에서 DaperZip을 오른쪽 클릭 → "열기"를 누르세요.</p>
+            <p>아직 Apple 공증 전이라 처음 실행할 때 경고가 나옵니다. macOS 14 이하에서는 Finder에서 DaperZip을 오른쪽 클릭 → "열기"를 누르세요. macOS 15 이상에서는 <strong>시스템 설정 → 개인정보 보호 및 보안</strong>에서 DaperZip의 <strong>"확인 없이 열기"</strong>를 누르면 됩니다.</p>
+            <p>터미널을 쓸 수 있다면 <code>xattr -dr com.apple.quarantine /Applications/DaperZip.app</code>로 격리 표시를 지울 수 있습니다.</p>
           </article>
           <article>
             <h3>Linux</h3>
@@ -236,7 +237,7 @@
         <details><summary>7-Zip과 무엇이 다른가요?</summary><p>압축 처리는 7-Zip 엔진이 담당하고, DaperZip은 그 위에 한글 파일 이름 자동 복구, 스마트 풀기, 압축 파일 안에서 바로 편집, 탐색기 오른쪽 클릭 메뉴 같은 사용 편의 기능을 얹은 별개의 프로젝트입니다.</p></details>
         <details><summary>RAR 파일도 풀 수 있나요?</summary><p>네, RAR을 열고 풀 수 있습니다. 다만 RAR 형식으로 새로 압축하는 기능은 없습니다. 새로 만들 때는 ZIP, 7Z, TAR 계열, WIM을 고를 수 있습니다.</p></details>
         <details><summary>압축 파일의 한글 이름이 깨져요.</summary><p>DaperZip은 Mac에서 만든 압축 파일의 자모 분리와 옛 Windows(CP949) ZIP의 깨진 이름을 자동으로 감지해 고칩니다. 설정에서 ZIP 파일 이름 인코딩을 직접 고를 수도 있습니다.</p></details>
-        <details><summary>설치할 때 경고가 나와요.</summary><p>현재 코드 서명이 없어서 Windows와 macOS가 처음 실행할 때 경고를 보여 줍니다. 위 설치 안내의 방법으로 실행할 수 있습니다. 릴리스에는 파일 검증용 SHA256SUMS가 함께 올라갑니다.</p></details>
+        <details><summary>설치할 때 경고가 나와요.</summary><p>현재 코드 서명이 없어서 Windows와 macOS가 처음 실행할 때 경고를 보여 줍니다. Windows는 "추가 정보" → "실행", macOS 14 이하는 오른쪽 클릭 → "열기", macOS 15 이상은 시스템 설정 → 개인정보 보호 및 보안 → "확인 없이 열기"를 이용하세요. 릴리스에는 파일 검증용 SHA256SUMS가 함께 올라갑니다.</p></details>
         <details><summary>개인정보를 수집하나요?</summary><p>아니요. 압축과 해제는 모두 내 컴퓨터에서 처리되고, 파일이나 사용 정보는 어디로도 전송되지 않습니다. 시작할 때 새 버전이 있는지 GitHub에 확인하며, 설정에서 끌 수 있습니다. 자세한 내용은 개인정보 안내를 참고하세요.</p></details>
         <details><summary>어떤 운영체제를 지원하나요?</summary><p>Windows 10 / 11(x64), macOS 10.15 이상(Apple Silicon · Intel), Linux x64(deb · AppImage)를 지원합니다.</p></details>
       </div>
