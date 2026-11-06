@@ -190,7 +190,7 @@ jobs:
             Start-Sleep -Seconds 2
           }
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: runner.os == 'Windows'
         with:
           name: installer-screenshots
