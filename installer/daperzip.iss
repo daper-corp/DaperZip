@@ -111,6 +111,10 @@ ko.Failed=설치하지 못했습니다 (코드 %1).
 en.Failed=Installation failed (code %1).
 ko.Browse=설치할 폴더를 고르세요.
 en.Browse=Choose the installation folder.
+ko.SetDefault=기본 앱으로 설정
+en.SetDefault=Set as default app
+ko.SetDefaultNote=Windows 기본 앱 화면에서 DaperZip을 선택하면 압축 파일이 DaperZip으로 열립니다.
+en.SetDefaultNote=Choose DaperZip in Windows Default apps to open archives with DaperZip.
 
 [Tasks]
 Name: "contextmenu"; Description: "{cm:TaskMenu}"
@@ -134,6 +138,10 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopico
 
 [Run]
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "WebView2"; Flags: waituntilterminated; Check: NeedsWebView2
+; "Open with" + Default Apps registration (Windows still asks the user to
+; choose the actual default). Writes HKCU for a per-user install and HKLM
+; for an all-users install.
+Filename: "{app}\{#AppExe}"; Parameters: "--register-assoc"; Flags: runhidden waituntilterminated
 ; The app registers the menu for this user (per-user install) or for
 ; everyone (Program Files install).
 Filename: "{app}\{#AppExe}"; Parameters: "--register-shell"; Flags: runhidden waituntilterminated; Tasks: contextmenu
@@ -169,6 +177,7 @@ var
   DirTouched: Boolean;
   ElevatedDone: Boolean;
   ElevationRefused: Boolean;
+  InstalledAllUsers: Boolean;
   DonePanel: TPanel;
   FooterText: TNewStaticText;
   StatusText, ErrorText: TNewStaticText;
@@ -508,6 +517,7 @@ begin
     Ok := RunSetupAgain(SilentParams('/CURRENTUSER'), True, Code);
   if Ok and (Code = 0) then
   begin
+    InstalledAllUsers := AllUsers;
     EndWait(True);
     exit;
   end;
@@ -534,6 +544,7 @@ begin
     exit;
   end;
   // The scope matches this process: normal install right here.
+  InstalledAllUsers := ScopeAll.Checked;
   WizardForm.DirEdit.Text := DirEdit.Text;
   WizardSelectTasks('!contextmenu,!desktopicon');
   if TaskList <> '' then WizardSelectTasks(TaskList);
@@ -557,6 +568,32 @@ begin
   WizardForm.Close;
 end;
 
+// Windows does not let an installer set the default handler silently, so
+// open the user-facing Default Apps page for DaperZip instead.
+procedure OpenDefaultAppsClick(Sender: TObject);
+var
+  Uri: String;
+  Code: Integer;
+begin
+  if InstalledAllUsers then
+    Uri := 'ms-settings:defaultapps?registeredAppMachine={#AppName}'
+  else
+    Uri := 'ms-settings:defaultapps?registeredAppUser={#AppName}';
+  // Open Settings in the original user's session even when Setup is elevated.
+  if not ExecAsOriginalUser(ExpandConstant('{cmd}'), '/C start "" "' + Uri + '"', '',
+    SW_HIDE, ewNoWait, Code) then
+    ShellExec('open', Uri, '', '', SW_SHOWNORMAL, ewNoWait, Code);
+end;
+
+function NewDefaultAppsButton(Parent: TWinControl; X, Y, W: Integer): TNewButton;
+begin
+  Result := TNewButton.Create(WizardForm);
+  Result.Parent := Parent;
+  Result.Caption := CustomMessage('SetDefault');
+  Result.SetBounds(X, Y, W, ScaleY(30));
+  Result.OnClick := @OpenDefaultAppsClick;
+end;
+
 // Done screen for the elevated path (the normal path uses wpFinished).
 procedure ShowDone(const AppDir: String);
 var
@@ -573,6 +610,9 @@ begin
   AddHeader(DonePanel);
   NewLabel(DonePanel, CustomMessage('Done'), ScaleX(32), ScaleY(110), 0, 13, Ink, True);
   NewLabel(DonePanel, CustomMessage('DoneNote'), ScaleX(32), ScaleY(140), DonePanel.ClientWidth - ScaleX(64), 9, Muted, False);
+  NewDefaultAppsButton(DonePanel, ScaleX(32), ScaleY(184), ScaleX(190));
+  NewLabel(DonePanel, CustomMessage('SetDefaultNote'), ScaleX(32), ScaleY(222),
+    DonePanel.ClientWidth - ScaleX(64), 8, Muted, False);
   InstallBtn.Visible := False;
   FooterText.Visible := False;
   LaunchBtn := NewStripButton(CustomMessage('Launch'), ScaleX(170), @LaunchClick, Lbl);
@@ -714,6 +754,9 @@ begin
     WizardForm.FinishedPage.ClientWidth - ScaleX(64), 9, Muted, False);
   if not WizardSilent then
   begin
+    NewDefaultAppsButton(WizardForm.FinishedPage, ScaleX(32), ScaleY(184), ScaleX(190));
+    NewLabel(WizardForm.FinishedPage, CustomMessage('SetDefaultNote'), ScaleX(32), ScaleY(222),
+      WizardForm.FinishedPage.ClientWidth - ScaleX(64), 8, Muted, False);
     LaunchBtn := NewStripButton(CustomMessage('Launch'), ScaleX(170), @LaunchClick, LaunchBtnLabel);
     LaunchBtn.Visible := False;
   end;

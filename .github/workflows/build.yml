@@ -175,25 +175,48 @@ jobs:
 
       # Explorer integration: register / unregister in both scopes and check
       # the registry (runners are admins, so HKLM is writable).
-      - name: Check Explorer menu registration
+      - name: Check Explorer menu and file association registration
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          function CheckValue($path, $name, $expected, $label) {
+            $key = Get-Item -LiteralPath $path -ErrorAction Stop
+            $value = $key.GetValue($name)
+            if ($null -eq $value) { throw "$label missing" }
+            if ($null -ne $expected -and $value -ne $expected) { throw "$label is '$value', expected '$expected'" }
+            Write-Host "OK  $label"
+          }
           $exe = (Get-Item target/release/DaperZip.exe -ErrorAction SilentlyContinue) ?? (Get-Item target/release/daperzip.exe)
           foreach ($scope in 'user', 'machine') {
             $hive = if ($scope -eq 'user') { 'HKCU:' } else { 'HKLM:' }
-            Start-Process $exe.FullName -ArgumentList "--register-shell=$scope" -Wait
-            $cmd = (Get-ItemProperty "$hive\Software\Classes\SystemFileAssociations\.zip\shell\DaperZip.Extract\shell\1smart\command").'(default)'
-            $cmd2 = (Get-ItemProperty "$hive\Software\Classes\Directory\shell\DaperZip.Compress\shell\1zip\command").'(default)'
+            foreach ($arg in "--register-shell=$scope", "--register-assoc=$scope") {
+              $p = Start-Process $exe.FullName -ArgumentList $arg -Wait -PassThru
+              if ($p.ExitCode -ne 0) { throw "$arg failed ($($p.ExitCode))" }
+            }
+            $cmd = (Get-Item -LiteralPath "$hive\Software\Classes\SystemFileAssociations\.zip\shell\DaperZip.Extract\shell\1smart\command").GetValue('')
+            $cmd2 = (Get-Item -LiteralPath "$hive\Software\Classes\Directory\shell\DaperZip.Compress\shell\1zip\command").GetValue('')
             Write-Host "[$scope] $cmd"
             Write-Host "[$scope] $cmd2"
             if ($cmd -notlike "*--extract-smart*" -or $cmd2 -notlike "*--compress-zip*") { throw "menu not registered ($scope)" }
+            CheckValue "$hive\Software\Classes\.zip\OpenWithProgids" 'DaperZip.Archive' $null "open with ($scope)"
+            CheckValue "$hive\Software\Classes\Applications\DaperZip.exe" 'FriendlyAppName' 'DaperZip' "application ($scope)"
+            CheckValue "$hive\Software\RegisteredApplications" 'DaperZip' 'Software\DaperZip\Capabilities' "registered app ($scope)"
+            CheckValue "$hive\Software\DaperZip\Capabilities\FileAssociations" '.zip' 'DaperZip.Archive' "capabilities ($scope)"
+            $open = (Get-Item -LiteralPath "$hive\Software\Classes\DaperZip.Archive\shell\open\command").GetValue('')
+            if ($open -notlike "*DaperZip.exe*%1*") { throw "ProgID open command missing ($scope)" }
           }
           Start-Process $exe.FullName -ArgumentList '--unregister-shell' -Wait
           foreach ($hive in 'HKCU:', 'HKLM:') {
-            if (Test-Path -LiteralPath "$hive\Software\Classes\*\shell\DaperZip.Compress") { throw "menu not removed ($hive)" }
+            foreach ($base in '*', 'Directory') {
+              if (Test-Path -LiteralPath "$hive\Software\Classes\$base\shell\DaperZip.Compress") { throw "menu not removed ($hive\$base)" }
+            }
+            if (Test-Path -LiteralPath "$hive\Software\Classes\DaperZip.Archive") { throw "ProgID not removed ($hive)" }
+            if (Test-Path -LiteralPath "$hive\Software\Classes\Applications\DaperZip.exe") { throw "application not removed ($hive)" }
+            if (Test-Path -LiteralPath "$hive\Software\DaperZip\Capabilities") { throw "capabilities not removed ($hive)" }
+            $registered = Get-Item -LiteralPath "$hive\Software\RegisteredApplications" -ErrorAction SilentlyContinue
+            if ($registered -and $null -ne $registered.GetValue('DaperZip')) { throw "registered app not removed ($hive)" }
           }
-          Write-Host "Explorer menu register/unregister OK"
+          Write-Host "Explorer menu and file association register/unregister OK"
 
       # ---- Windows installer (Inno Setup, installer/daperzip.iss) ----
       - name: Build Windows installer

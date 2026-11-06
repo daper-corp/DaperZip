@@ -333,6 +333,7 @@ fn app_info(state: State<AppState>) -> Value {
         "shellMenu": shell::menu_scope().is_some(),
         "shellMenuScope": shell::menu_scope(),
         "assoc": shell::assoc_registered(),
+        "assocScope": shell::assoc_scope(),
     })
 }
 
@@ -567,16 +568,22 @@ fn set_shell_menu(state: State<AppState>, enabled: bool) -> CmdResult<()> {
 #[tauri::command]
 fn set_file_assoc(enabled: bool) -> CmdResult<()> {
     if enabled {
-        shell::register_assoc()?;
+        shell::register_assoc(shell::Scope::User)?;
     } else {
-        shell::unregister_assoc()?;
+        shell::unregister_assoc(shell::Scope::User)?;
     }
     Ok(())
 }
 
 #[tauri::command]
 fn open_default_apps() -> CmdResult<()> {
-    tauri_plugin_opener::open_url("ms-settings:defaultapps", None::<&str>)
+    let uri = match shell::assoc_scope() {
+        Some(shell::Scope::Machine) => "ms-settings:defaultapps?registeredAppMachine=DaperZip",
+        Some(shell::Scope::User) => "ms-settings:defaultapps?registeredAppUser=DaperZip",
+        None => "ms-settings:defaultapps",
+    };
+    tauri_plugin_opener::open_url(uri, None::<&str>)
+        .or_else(|_| tauri_plugin_opener::open_url("ms-settings:defaultapps", None::<&str>))
         .map_err(|e| e.to_string().into())
 }
 
@@ -1084,6 +1091,7 @@ fn main() {
     let argv: Vec<String> = std::env::args().collect();
     // Used by the installer / uninstaller (and CI). No window is shown.
     //   --register-shell[=user|machine]   default: follows the install location
+    //   --register-assoc[=user|machine]   "Open with" + Default Apps registration
     //   --unregister-shell                removes both scopes (machine needs admin)
     if let Some(arg) = argv.get(1) {
         if let Some(rest) = arg.strip_prefix("--register-shell") {
@@ -1097,10 +1105,22 @@ fn main() {
                 .is_ok();
             std::process::exit(if ok { 0 } else { 1 });
         }
+        if let Some(rest) = arg.strip_prefix("--register-assoc") {
+            let scope = match rest {
+                "=user" => shell::Scope::User,
+                "=machine" => shell::Scope::Machine,
+                _ => shell::install_scope(),
+            };
+            let ok = shell::register_assoc(scope)
+                .or_else(|_| shell::register_assoc(shell::Scope::User))
+                .is_ok();
+            std::process::exit(if ok { 0 } else { 1 });
+        }
         if arg == "--unregister-shell" {
             let _ = shell::unregister_menu(shell::Scope::Machine);
             let _ = shell::unregister_menu(shell::Scope::User);
-            let _ = shell::unregister_assoc();
+            let _ = shell::unregister_assoc(shell::Scope::Machine);
+            let _ = shell::unregister_assoc(shell::Scope::User);
             return;
         }
     }

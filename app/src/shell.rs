@@ -27,6 +27,9 @@ mod imp {
     const EXTRACT_KEY: &str = "DaperZip.Extract";
     const COMPRESS_KEY: &str = "DaperZip.Compress";
     const PROGID: &str = "DaperZip.Archive";
+    const APP_KEY: &str = "DaperZip.exe";
+    const REG_NAME: &str = "DaperZip";
+    const CAPABILITIES: &str = "Software\\DaperZip\\Capabilities";
 
     /// Extensions that get the extract menu and the "Open with" entry.
     pub const EXTS: &[&str] = &[
@@ -56,6 +59,16 @@ mod imp {
 
     fn classes_ro(scope: Scope) -> Option<RegKey> {
         root(scope).open_subkey("Software\\Classes").ok()
+    }
+
+    fn registered_apps(scope: Scope) -> std::io::Result<RegKey> {
+        root(scope)
+            .create_subkey("Software\\RegisteredApplications")
+            .map(|(k, _)| k)
+    }
+
+    fn capabilities(scope: Scope) -> std::io::Result<RegKey> {
+        root(scope).create_subkey(CAPABILITIES).map(|(k, _)| k)
     }
 
     fn verb(parent: &RegKey, key: &str, label: &str, args: &str) -> std::io::Result<()> {
@@ -189,30 +202,41 @@ mod imp {
         })
     }
 
-    pub fn register_assoc() -> std::io::Result<()> {
-        let cls = classes(Scope::User)?;
+    pub fn register_assoc(scope: Scope) -> std::io::Result<()> {
+        let cls = classes(scope)?;
         let (p, _) = cls.create_subkey(PROGID)?;
         p.set_value("", &"DaperZip Archive")?;
+        p.set_value("FriendlyTypeName", &"DaperZip Archive")?;
         p.create_subkey("DefaultIcon")?
             .0
             .set_value("", &format!("\"{}\",0", exe()))?;
         p.create_subkey("shell\\open\\command")?
             .0
             .set_value("", &format!("\"{}\" \"%1\"", exe()))?;
-        let (app, _) = cls.create_subkey("Applications\\DaperZip.exe")?;
+        let (app, _) = cls.create_subkey(format!("Applications\\{APP_KEY}"))?;
         app.set_value("FriendlyAppName", &"DaperZip")?;
+        app.set_value("ApplicationCompany", &"Daper")?;
+        app.set_value("ApplicationIcon", &format!("\"{}\",0", exe()))?;
         let (sup, _) = app.create_subkey("SupportedTypes")?;
+
+        let cap = capabilities(scope)?;
+        cap.set_value("ApplicationName", &"DaperZip")?;
+        cap.set_value("ApplicationDescription", &"DaperZip file archiver")?;
+        let (files, _) = cap.create_subkey("FileAssociations")?;
+
         for ext in EXTS {
             let (k, _) = cls.create_subkey(format!(".{ext}\\OpenWithProgids"))?;
             k.set_value(PROGID, &"")?;
             sup.set_value(format!(".{ext}"), &"")?;
+            files.set_value(format!(".{ext}"), &PROGID)?;
         }
+        registered_apps(scope)?.set_value(REG_NAME, &CAPABILITIES)?;
         notify();
         Ok(())
     }
 
-    pub fn unregister_assoc() -> std::io::Result<()> {
-        let cls = classes(Scope::User)?;
+    pub fn unregister_assoc(scope: Scope) -> std::io::Result<()> {
+        let cls = classes(scope)?;
         for ext in EXTS {
             if let Ok(k) =
                 cls.open_subkey_with_flags(format!(".{ext}\\OpenWithProgids"), KEY_ALL_ACCESS)
@@ -221,15 +245,41 @@ mod imp {
             }
         }
         let _ = cls.delete_subkey_all(PROGID);
-        let _ = cls.delete_subkey_all("Applications\\DaperZip.exe");
+        let _ = cls.delete_subkey_all(format!("Applications\\{APP_KEY}"));
+        if let Ok(k) =
+            root(scope).open_subkey_with_flags("Software\\RegisteredApplications", KEY_ALL_ACCESS)
+        {
+            let _ = k.delete_value(REG_NAME);
+        }
+        if let Ok(k) = root(scope).open_subkey_with_flags("Software\\DaperZip", KEY_ALL_ACCESS) {
+            let _ = k.delete_subkey_all("Capabilities");
+        }
         notify();
         Ok(())
     }
 
-    pub fn assoc_registered() -> bool {
-        classes_ro(Scope::User)
+    fn assoc_in(scope: Scope) -> bool {
+        if classes_ro(scope)
             .map(|c| c.open_subkey(PROGID).is_ok())
             .unwrap_or(false)
+        {
+            return true;
+        }
+        root(scope)
+            .open_subkey("Software\\RegisteredApplications")
+            .ok()
+            .and_then(|k| k.get_value::<String, _>(REG_NAME).ok())
+            .is_some()
+    }
+
+    pub fn assoc_scope() -> Option<Scope> {
+        [Scope::Machine, Scope::User]
+            .into_iter()
+            .find(|s| assoc_in(*s))
+    }
+
+    pub fn assoc_registered() -> bool {
+        assoc_scope().is_some()
     }
 
     fn notify() {
@@ -267,11 +317,14 @@ mod imp {
     pub fn menu_scope() -> Option<Scope> {
         None
     }
-    pub fn register_assoc() -> std::io::Result<()> {
+    pub fn register_assoc(_scope: Scope) -> std::io::Result<()> {
         unsupported()
     }
-    pub fn unregister_assoc() -> std::io::Result<()> {
+    pub fn unregister_assoc(_scope: Scope) -> std::io::Result<()> {
         Ok(())
+    }
+    pub fn assoc_scope() -> Option<Scope> {
+        None
     }
     pub fn assoc_registered() -> bool {
         false

@@ -282,7 +282,8 @@
       const machineMenu = info.shellMenuScope === "machine";
       const menu = h("input", { type: "checkbox", disabled: !isWin || machineMenu });
       menu.checked = info.shellMenu;
-      const assoc = h("input", { type: "checkbox", disabled: !isWin });
+      const machineAssoc = info.assocScope === "machine";
+      const assoc = h("input", { type: "checkbox", disabled: !isWin || machineAssoc });
       assoc.checked = info.assoc;
       const err = h("div", { class: "err" });
       const engine = info.sevenzip.error
@@ -314,6 +315,7 @@
         h("label", { class: "check" }, menu, t("오른쪽 클릭 메뉴에 DaperZip 추가")),
         machineMenu ? h("div", { class: "note" }, t("모든 사용자용으로 설치되어 설치 프로그램이 관리합니다.")) : null,
         h("label", { class: "check" }, assoc, t("압축 파일 '연결 프로그램'에 DaperZip 등록")),
+        machineAssoc ? h("div", { class: "note" }, t("모든 사용자용으로 설치되어 설치 프로그램이 관리합니다.")) : null,
         h("div", { class: "note" }, isWin ? t("Windows 11에서는 '추가 옵션 표시' 안에 나타납니다.") : t("Windows에서만 사용할 수 있습니다.") + " " + t("Mac/Linux에서는 Finder·파일 관리자의 '다음으로 열기'로 DaperZip을 고를 수 있습니다.")),
         isWin ? h("div", null, h("button", { class: "btn", onclick: () => API.call("open_default_apps") }, t("기본 앱 설정 열기"))) : null,
         err,
