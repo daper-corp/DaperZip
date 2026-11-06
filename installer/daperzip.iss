@@ -139,6 +139,7 @@ const
   WebView2Key = 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
   WebView2KeyWow = 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
   UninstKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{13371C5E-DE99-47B0-8A62-96AC45691B98}_is1';
+  NsisUninstKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\DaperZip';
   Accent = $ED6F2F;      // #2F6FED in BGR
   AccentSoft = $FEF3EE;  // #EEF3FE
   Ink = $30221C;         // #1C2230
@@ -195,6 +196,38 @@ end;
 function UserDir: String;
 begin
   Result := ExpandConstant('{localappdata}\Programs\{#AppName}');
+end;
+
+// Where the previous (Tauri NSIS) installer put a per-user DaperZip.
+function NsisUserDir: String;
+begin
+  Result := ExpandConstant('{localappdata}\{#AppName}');
+end;
+
+function HasNsisInstall(const Dir: String): Boolean;
+begin
+  Result := FileExists(AddBackslash(Dir) + 'uninstall.exe');
+end;
+
+// The scope an existing DaperZip was installed in. Updates must follow it:
+// defaulting a per-user 0.1.0 (NSIS) install to "all users" makes Setup ask
+// for admin rights, which fails for a standard user and lands on NeedAdmin.
+function ExistingAllUsers: Boolean;
+begin
+  if RegKeyExists(HKLM, UninstKey) then
+    Result := True
+  else if RegKeyExists(HKCU, UninstKey) then
+    Result := False
+  else if HasNsisInstall(AllUsersDir) then
+    Result := True
+  else if HasNsisInstall(NsisUserDir) then
+    Result := False
+  else if RegKeyExists(HKLM, NsisUninstKey) then
+    Result := True
+  else if RegKeyExists(HKCU, NsisUninstKey) then
+    Result := False
+  else
+    Result := True; // fresh install: all users (recommended)
 end;
 
 function NewLabel(Parent: TWinControl; const Text: String; X, Y, W: Integer;
@@ -519,10 +552,11 @@ begin
   Marquee.Visible := False;
   ErrorText := NewLabel(S, '', X, Y, W - 2 * X, 9, $3B48E5, False);
 
-  // Default: all users, unless DaperZip is already installed just for this user.
-  ScopeAll.Checked := not (RegKeyExists(HKCU, UninstKey) and not RegKeyExists(HKLM, UninstKey));
-  ScopeMe.Checked := not ScopeAll.Checked;
+  // Follow an existing install's scope (Inno Setup or the older NSIS build);
+  // a fresh install defaults to all users.
+  ScopeAll.Checked := ExistingAllUsers;
   if IsAdminInstallMode then ScopeAll.Checked := True;
+  ScopeMe.Checked := not ScopeAll.Checked;
   PaintScope;
 end;
 
@@ -568,6 +602,7 @@ end;
 
 var
   NextLeft: Integer;
+  CancelLeft: Integer;
 
 procedure CurPageChanged(CurPageID: Integer);
 begin
@@ -576,7 +611,15 @@ begin
   if WizardSilent then exit;
   if NextLeft = 0 then NextLeft := WizardForm.NextButton.Left;
   WizardForm.BackButton.Visible := False;
-  WizardForm.CancelButton.Visible := CurPageID = wpInstalling;
+  // Inno disables the title-bar X (and Alt+F4) whenever CancelButton.CanFocus
+  // is false, so hiding Cancel made our screens impossible to close. Inno
+  // already shows Cancel on this page; keep it shown and merely park it
+  // off-screen, the same way the Next button is hidden.
+  if CancelLeft = 0 then CancelLeft := WizardForm.CancelButton.Left;
+  if CurPageID = wpInstalling then
+    WizardForm.CancelButton.Left := CancelLeft
+  else if WizardForm.CancelButton.Visible then
+    WizardForm.CancelButton.Left := -ScaleX(2000);
   if InstallBtn <> nil then
   begin
     InstallBtn.Visible := (CurPageID = OptionsPage.ID) and not ElevatedDone;

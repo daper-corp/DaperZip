@@ -525,13 +525,18 @@ async fn install_update(
 
 /// Arguments for running a downloaded installer from the updater.
 ///
-/// Installed with the DaperZip installer (unins000.exe next to the exe):
-/// update silently in the same scope and restart the app. Anything else
-/// (portable copy, older installer): just open the installer normally.
+/// Installed with the DaperZip installer (Inno Setup writes unins000.exe, the
+/// older NSIS build wrote uninstall.exe): update silently in the same scope
+/// and restart the app. Anything else (portable copy): just open the
+/// installer normally.
 fn installer_args() -> Vec<&'static str> {
     let installed = std::env::current_exe()
         .ok()
-        .and_then(|p| p.parent().map(|d| d.join("unins000.exe").exists()))
+        .and_then(|p| {
+            p.parent().map(|d| {
+                d.join("unins000.exe").exists() || d.join("uninstall.exe").exists()
+            })
+        })
         .unwrap_or(false);
     if !installed {
         return vec![];
