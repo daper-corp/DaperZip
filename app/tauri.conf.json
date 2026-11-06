@@ -30,17 +30,8 @@
     "copyright": "DaperZip contributors. 7-Zip (c) Igor Pavlov.",
     "license": "MIT",
     "windows": {
-      "nsis": {
-        "installMode": "both",
-        "languages": [
-          "Korean",
-          "English"
-        ],
-        "displayLanguageSelector": false,
-        "installerHooks": "./installer-hooks.nsh"
-      },
       "webviewInstallMode": {
-        "type": "downloadBootstrapper"
+        "type": "skip"
       }
     }
   }

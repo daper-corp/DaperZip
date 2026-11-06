@@ -515,12 +515,32 @@ async fn install_update(
                 .await
                 .map_err(|e| ErrorPayload::from(e.to_string()))?
                 .map_err(ErrorPayload::from)?;
-            std::process::Command::new(&path).spawn()?;
+            std::process::Command::new(&path).args(installer_args()).spawn()?;
             app.exit(0);
             Ok(())
         }
         _ => tauri_plugin_opener::open_url(page, None::<&str>).map_err(|e| e.to_string().into()),
     }
+}
+
+/// Arguments for running a downloaded installer from the updater.
+///
+/// Installed with the DaperZip installer (unins000.exe next to the exe):
+/// update silently in the same scope and restart the app. Anything else
+/// (portable copy, older installer): just open the installer normally.
+fn installer_args() -> Vec<&'static str> {
+    let installed = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.join("unins000.exe").exists()))
+        .unwrap_or(false);
+    if !installed {
+        return vec![];
+    }
+    let scope = match shell::install_scope() {
+        shell::Scope::Machine => "/ALLUSERS",
+        shell::Scope::User => "/CURRENTUSER",
+    };
+    vec!["/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/DZUPDATE", scope]
 }
 
 #[tauri::command]

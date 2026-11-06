@@ -4,3 +4,4 @@
 /portable
 node_modules
 .DS_Store
+/installer/MicrosoftEdgeWebview2Setup.exe

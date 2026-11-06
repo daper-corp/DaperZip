@@ -60,7 +60,7 @@ jobs:
         include:
           - os: windows-latest
             sevenzip: windows-x64
-            args: ""
+            args: "--no-bundle" # the installer is made with Inno Setup below
           - os: macos-latest
             sevenzip: macos
             args: "--target universal-apple-darwin"
@@ -126,6 +126,76 @@ jobs:
             if (Test-Path -LiteralPath "$hive\Software\Classes\*\shell\DaperZip.Compress") { throw "menu not removed ($hive)" }
           }
           Write-Host "Explorer menu register/unregister OK"
+
+      # ---- Windows installer (Inno Setup, installer/daperzip.iss) ----
+      - name: Build Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          $lang = Join-Path (Split-Path $iscc) 'Languages\Korean.isl'
+          if (-not (Test-Path $lang)) {
+            Invoke-WebRequest 'https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/Korean.isl' -OutFile $lang
+          }
+          # WebView2 runtime bootstrapper (installed only where missing)
+          Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile installer\MicrosoftEdgeWebview2Setup.exe
+          $v = (Get-Content app\tauri.conf.json | ConvertFrom-Json).version
+          & $iscc /Qp "/DAppVersion=$v" installer\daperzip.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
+          Get-ChildItem dist
+
+      - name: Test Windows installer (silent install / uninstall)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem dist\DaperZip_*_x64-setup.exe).FullName
+          function Check($cond, $msg) { if (-not $cond) { throw $msg } ; Write-Host "OK  $msg" }
+          $cases = @(
+            @{ Flag = '/CURRENTUSER'; Dir = "$env:LOCALAPPDATA\Programs\DaperZip"; Hive = 'HKCU:' },
+            @{ Flag = '/ALLUSERS';    Dir = "$env:ProgramFiles\DaperZip";          Hive = 'HKLM:' }
+          )
+          foreach ($c in $cases) {
+            $p = Start-Process $setup -ArgumentList "$($c.Flag) /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /TASKS=contextmenu,desktopicon" -Wait -PassThru
+            Check ($p.ExitCode -eq 0) "$($c.Flag): setup exit code 0"
+            Check (Test-Path "$($c.Dir)\DaperZip.exe") "$($c.Flag): DaperZip.exe installed in $($c.Dir)"
+            Check (Test-Path "$($c.Dir)\7zip\7z.dll") "$($c.Flag): 7-Zip installed"
+            $cmd = (Get-ItemProperty "$($c.Hive)\Software\Classes\SystemFileAssociations\.zip\shell\DaperZip.Extract\shell\1smart\command").'(default)'
+            Check ($cmd -like "*$($c.Dir)\DaperZip.exe*") "$($c.Flag): right-click menu points to the installed exe"
+            Check (Test-Path "$($c.Hive)\Software\Microsoft\Windows\CurrentVersion\Uninstall\{13371C5E-DE99-47B0-8A62-96AC45691B98}_is1") "$($c.Flag): listed in Apps & features"
+            $p = Start-Process "$($c.Dir)\unins000.exe" -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -Wait -PassThru
+            Start-Sleep -Seconds 3
+            Check (-not (Test-Path "$($c.Dir)\DaperZip.exe")) "$($c.Flag): files removed by uninstall"
+            Check (-not (Test-Path -LiteralPath "$($c.Hive)\Software\Classes\*\shell\DaperZip.Compress")) "$($c.Flag): right-click menu removed by uninstall"
+          }
+
+      - name: Screenshot Windows installer
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $setup = (Get-ChildItem dist\DaperZip_*_x64-setup.exe).FullName
+          New-Item -ItemType Directory -Force shots | Out-Null
+          foreach ($lang in 'ko', 'en') {
+            $p = Start-Process $setup -ArgumentList "/LANG=$lang" -PassThru
+            Start-Sleep -Seconds 8
+            $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            $g = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+            $bmp.Save("shots\installer-$lang.png")
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+            Get-Process | Where-Object { $_.ProcessName -like 'DaperZip_*' -or $_.ProcessName -like '*.tmp' } | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+          }
+
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: installer-screenshots
+          path: shots/*
+          if-no-files-found: ignore
 
       - name: Collect artifacts
         shell: bash
