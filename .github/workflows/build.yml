@@ -156,7 +156,9 @@ jobs:
             @{ Flag = '/ALLUSERS';    Dir = "$env:ProgramFiles\DaperZip";          Hive = 'HKLM:' }
           )
           foreach ($c in $cases) {
-            $p = Start-Process $setup -ArgumentList "$($c.Flag) /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /TASKS=contextmenu,desktopicon" -Wait -PassThru
+            $log = "$env:RUNNER_TEMP\setup$($c.Flag.Trim('/')).log"
+            $p = Start-Process $setup -ArgumentList "$($c.Flag) /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /TASKS=contextmenu,desktopicon /LOG=`"$log`"" -Wait -PassThru
+            if ($p.ExitCode -ne 0) { Write-Host "setup exit code: $($p.ExitCode)"; if (Test-Path $log) { Get-Content $log | Select-Object -Last 60 } }
             Check ($p.ExitCode -eq 0) "$($c.Flag): setup exit code 0"
             Check (Test-Path "$($c.Dir)\DaperZip.exe") "$($c.Flag): DaperZip.exe installed in $($c.Dir)"
             Check (Test-Path "$($c.Dir)\7zip\7z.dll") "$($c.Flag): 7-Zip installed"
