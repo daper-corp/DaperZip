@@ -42,7 +42,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 WizardStyle=modern
-WizardSizePercent=100
+WizardSizePercent=115,125
 SetupIconFile={#Root}\app\icons\icon.ico
 UninstallDisplayIcon={app}\{#AppExe}
 UninstallDisplayName={#AppName}
@@ -156,6 +156,7 @@ var
   DirTouched: Boolean;
   ElevatedDone: Boolean;
   DonePanel: TPanel;
+  FooterText: TNewStaticText;
   StatusText, ErrorText: TNewStaticText;
   Marquee: TNewProgressBar;
 
@@ -350,6 +351,26 @@ end;
 
 procedure ShowDone(const AppDir: String); forward;
 
+// Our buttons live in the wizard's bottom strip, where Next/Cancel were.
+function StripMargin: Integer;
+begin
+  Result := WizardForm.ClientWidth - (WizardForm.CancelButton.Left + WizardForm.CancelButton.Width);
+end;
+
+function StripTop(H: Integer): Integer;
+begin
+  Result := WizardForm.CancelButton.Top + (WizardForm.CancelButton.Height - H) div 2;
+end;
+
+function NewStripButton(const Text: String; W: Integer; OnClick: TNotifyEvent; var Lbl: TLabel): TPanel;
+var
+  H: Integer;
+begin
+  H := ScaleY(38);
+  Result := NewPrimaryButton(WizardForm, Text, WizardForm.ClientWidth - StripMargin - W, StripTop(H), W, H, OnClick, Lbl);
+  Result.BringToFront;
+end;
+
 // "All users" from a non-admin setup: run this installer again, elevated
 // and silent, and wait for it; this window shows progress meanwhile.
 function InstallElevated: Boolean;
@@ -426,13 +447,13 @@ begin
   AddHeader(DonePanel);
   NewLabel(DonePanel, CustomMessage('Done'), ScaleX(32), ScaleY(110), 0, 13, Ink, True);
   NewLabel(DonePanel, CustomMessage('DoneNote'), ScaleX(32), ScaleY(140), DonePanel.ClientWidth - ScaleX(64), 9, Muted, False);
-  LaunchBtn := NewPrimaryButton(DonePanel, CustomMessage('Launch'),
-    DonePanel.ClientWidth - ScaleX(32) - ScaleX(170), DonePanel.ClientHeight - ScaleY(64), ScaleX(170), ScaleY(42),
-    @LaunchClick, Lbl);
+  InstallBtn.Visible := False;
+  FooterText.Visible := False;
+  LaunchBtn := NewStripButton(CustomMessage('Launch'), ScaleX(170), @LaunchClick, Lbl);
   CloseBtn := TNewButton.Create(WizardForm);
-  CloseBtn.Parent := DonePanel;
+  CloseBtn.Parent := WizardForm;
   CloseBtn.Caption := CustomMessage('Close');
-  CloseBtn.SetBounds(ScaleX(32), DonePanel.ClientHeight - ScaleY(58), ScaleX(90), ScaleY(30));
+  CloseBtn.SetBounds(StripMargin, WizardForm.CancelButton.Top, WizardForm.CancelButton.Width, WizardForm.CancelButton.Height);
   CloseBtn.OnClick := @CloseClick;
 end;
 
@@ -442,7 +463,6 @@ procedure BuildOptionsPage;
 var
   S: TNewNotebookPage;
   W, X, Y, Half: Integer;
-  L: TNewStaticText;
   Browse: TNewButton;
 begin
   OptionsPage := CreateCustomPage(wpWelcome, '', '');
@@ -484,18 +504,19 @@ begin
   DesktopCheck.Caption := CustomMessage('TaskDesktop');
   DesktopCheck.Checked := True;
 
-  L := NewLabel(S, CustomMessage('Footer'), X, S.ClientHeight - ScaleY(46), 0, 8, Muted, False);
-  InstallBtn := NewPrimaryButton(S, CustomMessage('Install'),
-    W - X - ScaleX(150), S.ClientHeight - ScaleY(64), ScaleX(150), ScaleY(42), @InstallClick, InstallBtnLabel);
+  FooterText := NewLabel(WizardForm, CustomMessage('Footer'), StripMargin,
+    WizardForm.CancelButton.Top + ScaleY(6), 0, 8, Muted, False);
+  InstallBtn := NewStripButton(CustomMessage('Install'), ScaleX(150), @InstallClick, InstallBtnLabel);
 
-  StatusText := NewLabel(S, CustomMessage('Installing'), X, S.ClientHeight - ScaleY(70), 0, 10, Ink, True);
+  Y := Y + ScaleY(34);
+  StatusText := NewLabel(S, CustomMessage('Installing'), X, Y, 0, 10, Ink, True);
   StatusText.Visible := False;
   Marquee := TNewProgressBar.Create(WizardForm);
   Marquee.Parent := S;
-  Marquee.SetBounds(X, S.ClientHeight - ScaleY(44), W - 2 * X, ScaleY(8));
+  Marquee.SetBounds(X, Y + ScaleY(26), W - 2 * X, ScaleY(8));
   Marquee.Style := npbstMarquee;
   Marquee.Visible := False;
-  ErrorText := NewLabel(S, '', X, S.ClientHeight - ScaleY(96), W - 2 * X, 9, $3B48E5, False);
+  ErrorText := NewLabel(S, '', X, Y, W - 2 * X, 9, $3B48E5, False);
 
   // Default: all users, unless DaperZip is already installed just for this user.
   ScopeAll.Checked := not (RegKeyExists(HKCU, UninstKey) and not RegKeyExists(HKLM, UninstKey));
@@ -538,9 +559,10 @@ begin
   NewLabel(WizardForm.FinishedPage, CustomMessage('DoneNote'), ScaleX(32), ScaleY(140),
     WizardForm.FinishedPage.ClientWidth - ScaleX(64), 9, Muted, False);
   if not WizardSilent then
-    LaunchBtn := NewPrimaryButton(WizardForm.FinishedPage, CustomMessage('Launch'),
-      WizardForm.FinishedPage.ClientWidth - ScaleX(32) - ScaleX(170),
-      WizardForm.FinishedPage.ClientHeight - ScaleY(64), ScaleX(170), ScaleY(42), @LaunchClick, LaunchBtnLabel);
+  begin
+    LaunchBtn := NewStripButton(CustomMessage('Launch'), ScaleX(170), @LaunchClick, LaunchBtnLabel);
+    LaunchBtn.Visible := False;
+  end;
 end;
 
 var
@@ -554,10 +576,17 @@ begin
   if NextLeft = 0 then NextLeft := WizardForm.NextButton.Left;
   WizardForm.BackButton.Visible := False;
   WizardForm.CancelButton.Visible := CurPageID = wpInstalling;
+  if InstallBtn <> nil then
+  begin
+    InstallBtn.Visible := (CurPageID = OptionsPage.ID) and not ElevatedDone;
+    FooterText.Visible := InstallBtn.Visible;
+  end;
+  if LaunchBtn <> nil then
+    LaunchBtn.Visible := (CurPageID = wpFinished) or ElevatedDone;
   if CurPageID = wpFinished then
   begin
     WizardForm.NextButton.Caption := CustomMessage('Close');
-    WizardForm.NextButton.Left := ScaleX(32);
+    WizardForm.NextButton.Left := StripMargin;
   end
   else
     WizardForm.NextButton.Left := -ScaleX(2000);
