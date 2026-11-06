@@ -365,7 +365,7 @@
       return Dialogs.message(t("DaperZip 정보"), h("div", null,
         h("div", { class: "brand", style: { marginBottom: "10px" } }, h("span", { class: "logo", role: "img", "aria-label": "Daper" }), h("div", null, h("h1", { style: { fontSize: "20px" } }, "DaperZip"), h("p", null, `${t("버전")} ${info.version}`))),
         h("p", null, t("압축 엔진: 7-Zip (LGPL)") + " · " + t("라이선스: MIT")),
-        h("p", null, h("a", { href: "#", onclick: (e) => { e.preventDefault(); API.call("open_url", { url: "https://dapercorp.com" }); } }, "dapercorp.com")),
+        h("p", null, h("a", { href: "#", onclick: (e) => { e.preventDefault(); API.call("open_url", { url: "https://zip.dapercorp.com" }); } }, "zip.dapercorp.com")),
         h("p", { class: "note" }, info.sevenzip.error || `7-Zip ${info.sevenzip.version}`)), { icon: null });
     },
   };
