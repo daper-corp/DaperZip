@@ -447,7 +447,6 @@ var
 begin
   OptionsPage := CreateCustomPage(wpWelcome, '', '');
   S := OptionsPage.Surface;
-  S.Color := clWhite;
   W := S.ClientWidth;
   X := ScaleX(32);
   AddHeader(S);
@@ -514,7 +513,6 @@ begin
   WizardForm.Bevel1.Visible := False;
   WizardForm.Bevel.Visible := False;
   WizardForm.InnerNotebook.SetBounds(0, 0, WizardForm.InnerPage.ClientWidth, WizardForm.InnerPage.ClientHeight);
-  WizardForm.OuterNotebook.Color := clWhite;
   if not WizardSilent then
     BuildOptionsPage;
 
@@ -535,7 +533,6 @@ begin
   WizardForm.RunList.Visible := False;
   WizardForm.YesRadio.Visible := False;
   WizardForm.NoRadio.Visible := False;
-  WizardForm.FinishedPage.Color := clWhite;
   AddHeader(WizardForm.FinishedPage);
   NewLabel(WizardForm.FinishedPage, CustomMessage('Done'), ScaleX(32), ScaleY(110), 0, 13, Ink, True);
   NewLabel(WizardForm.FinishedPage, CustomMessage('DoneNote'), ScaleX(32), ScaleY(140),

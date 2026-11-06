@@ -1,0 +1,28 @@
+name: Installer check
+
+# Fast feedback for installer/daperzip.iss: compile it with placeholder
+# files (no Rust build), so script errors show up in about a minute.
+on:
+  push:
+    paths: ["installer/**", ".github/workflows/installer-check.yml"]
+  workflow_dispatch:
+
+jobs:
+  compile:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compile installer script
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          $lang = Join-Path (Split-Path $iscc) 'Languages\Korean.isl'
+          if (-not (Test-Path $lang)) {
+            Invoke-WebRequest 'https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/Korean.isl' -OutFile $lang
+          }
+          New-Item -ItemType Directory -Force target\release | Out-Null
+          Copy-Item "$env:WINDIR\System32\notepad.exe" target\release\DaperZip.exe
+          Copy-Item "$env:WINDIR\System32\notepad.exe" installer\MicrosoftEdgeWebview2Setup.exe
+          & $iscc /Qp "/DAppVersion=0.0.0" installer\daperzip.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
