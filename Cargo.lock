@@ -659,7 +659,7 @@ checksum = "914a755b7c2d4af2bdcff7ce1739e2db9a1b81a9b07123d8015786ae03c0980d"
 
 [[package]]
 name = "daperzip"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "clipboard-rs",
  "daperzip-core",
@@ -680,7 +680,7 @@ dependencies = [
 
 [[package]]
 name = "daperzip-core"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "encoding_rs",
  "regex",

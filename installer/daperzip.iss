@@ -7,7 +7,9 @@
 ; Build (CI does this):  ISCC /DAppVersion=0.1.1 installer\daperzip.iss
 ;
 ; Command-line switches (besides Inno's standard /SILENT, /VERYSILENT, /DIR=…):
-;   /ALLUSERS | /CURRENTUSER   install scope (all users needs admin rights)
+;   /ALLUSERS | /CURRENTUSER   install scope (all users needs admin rights);
+;                              interactive Setup without either asks for
+;                              admin rights at start
 ;   /DZUPDATE                  started by DaperZip's updater: restart the app
 ;                              when done
 
@@ -35,7 +37,14 @@ DisableWelcomePage=yes
 DisableDirPage=yes
 DisableReadyPage=yes
 DisableFinishedPage=no
-; Starts without admin rights; "all users" re-runs elevated (see [Code]).
+; An interactive Setup asks for administrator rights (UAC) as soon as it
+; starts (see InitializeSetup) and the elevated copy installs for all users.
+; If UAC is cancelled or refused, this window opens without elevation and
+; installs "Just me". Silent runs (DaperZip's updater, winget, CI) skip this
+; and choose the scope with /ALLUSERS or /CURRENTUSER.
+; Note: Inno (6.4+) blocks [Code] from running the setup .exe itself before
+; installing (error 5), which is what broke "all users" before; Setup re-runs
+; itself through cmd.exe instead (RunSetupAgain).
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=commandline
 ArchitecturesAllowed=x64compatible
@@ -96,8 +105,8 @@ ko.Launch=DaperZip 실행
 en.Launch=Open DaperZip
 ko.Close=닫기
 en.Close=Close
-ko.NeedAdmin=관리자 권한을 얻지 못했습니다. "나만 사용"으로 전환했습니다. 설치를 다시 눌러 주세요.
-en.NeedAdmin=Administrator rights were not granted. Switched to "Just me" — click Install again.
+ko.NeedAdmin=관리자 권한을 얻지 못해 "나만 사용"으로 설치합니다. 모든 사용자에게 설치하려면 설치 프로그램을 다시 실행하고 사용자 계정 컨트롤에서 "예"를 누르세요.
+en.NeedAdmin=Administrator rights were not granted, so DaperZip installs for this account only. To install for all users, run Setup again and click "Yes" in User Account Control.
 ko.Failed=설치하지 못했습니다 (코드 %1).
 en.Failed=Installation failed (code %1).
 ko.Browse=설치할 폴더를 고르세요.
@@ -139,15 +148,12 @@ const
   WebView2Key = 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
   WebView2KeyWow = 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
   UninstKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{13371C5E-DE99-47B0-8A62-96AC45691B98}_is1';
-  NsisUninstKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\DaperZip';
   Accent = $ED6F2F;      // #2F6FED in BGR
   AccentSoft = $FEF3EE;  // #EEF3FE
   Ink = $30221C;         // #1C2230
   Muted = $85736B;       // #6B7385
   Line = $E1D6CF;        // #CFD6E1
-  TOKEN_QUERY = $0008;
-  TokenElevationType = 18;
-  TokenElevation = 20;
+  PillIdle = $F6F4F3;    // #F3F4F6
   DWMWA_WINDOW_CORNER_PREFERENCE = 33;
   DWMWCP_ROUND = 2;
 
@@ -155,12 +161,14 @@ var
   OptionsPage: TWizardPage;
   ScopeAllCard, ScopeMeCard: TPanel;
   ScopeAll, ScopeMe: TNewRadioButton;
+  ScopeAllTitle, ScopeAllNote, ScopeMeTitle, ScopeMeNote: TLabel;
   DirEdit: TNewEdit;
   MenuCheck, DesktopCheck: TNewCheckBox;
   InstallBtn, LaunchBtn: TPanel;
   InstallBtnLabel, LaunchBtnLabel: TLabel;
   DirTouched: Boolean;
   ElevatedDone: Boolean;
+  ElevationRefused: Boolean;
   DonePanel: TPanel;
   FooterText: TNewStaticText;
   StatusText, ErrorText: TNewStaticText;
@@ -168,17 +176,6 @@ var
 
 // ---------------------------------------------------------------- win32
 
-function OpenProcessToken(ProcessHandle: THandle; DesiredAccess: Cardinal;
-  var TokenHandle: THandle): Boolean;
-  external 'OpenProcessToken@advapi32.dll stdcall';
-function GetCurrentProcess: THandle;
-  external 'GetCurrentProcess@kernel32.dll stdcall';
-function GetTokenInformation(TokenHandle: THandle; TokenInformationClass: Integer;
-  var TokenInformation: Integer; TokenInformationLength: Cardinal;
-  var ReturnLength: Cardinal): Boolean;
-  external 'GetTokenInformation@advapi32.dll stdcall';
-function CloseHandle(hObject: THandle): Boolean;
-  external 'CloseHandle@kernel32.dll stdcall';
 function CreateRoundRectRgn(X1, Y1, X2, Y2, W, H: Integer): Integer;
   external 'CreateRoundRectRgn@gdi32.dll stdcall';
 function SetWindowRgn(hWnd: HWND; hRgn: Integer; bRedraw: Integer): Integer;
@@ -224,45 +221,20 @@ begin
   Result := ExpandConstant('{localappdata}\Programs\{#AppName}');
 end;
 
-// Where the previous (Tauri NSIS) installer put a per-user DaperZip.
-function NsisUserDir: String;
-begin
-  Result := ExpandConstant('{localappdata}\{#AppName}');
-end;
-
-function HasNsisInstall(const Dir: String): Boolean;
-begin
-  Result := FileExists(AddBackslash(Dir) + 'uninstall.exe');
-end;
-
-// True when this account can elevate (is an administrator), even though this
-// Setup process runs non-elevated because PrivilegesRequired=lowest.
-function CanElevate: Boolean;
+// Run this setup .exe again with Params and wait. Inno Setup (6.4+) refuses
+// to let [Code] Exec, ShellExec or copy the setup .exe itself before the
+// installation starts (it fails with error 5), so go through cmd.exe. With
+// /ALLUSERS the new copy elevates through Inno's own UAC prompt; if UAC is
+// cancelled it exits with code 2.
+function RunSetupAgain(const Params: String; AsOriginalUser: Boolean; var Code: Integer): Boolean;
 var
-  Token: THandle;
-  Kind, Elevated: Integer;
-  Len: Cardinal;
+  CmdParams: String;
 begin
-  Result := False;
-  Token := 0;
-  if not OpenProcessToken(GetCurrentProcess, TOKEN_QUERY, Token) then
-    Exit;
-  Kind := 0;
-  Len := 0;
-  if GetTokenInformation(Token, TokenElevationType, Kind, SizeOf(Kind), Len) then
-  begin
-    // 2 = full token, 3 = filtered admin token (can elevate)
-    if (Kind = 2) or (Kind = 3) then
-      Result := True
-    else if Kind = 1 then
-    begin
-      // UAC disabled: a full token is already elevated.
-      Elevated := 0;
-      if GetTokenInformation(Token, TokenElevation, Elevated, SizeOf(Elevated), Len) then
-        Result := Elevated <> 0;
-    end;
-  end;
-  CloseHandle(Token);
+  CmdParams := '/S /C ""' + ExpandConstant('{srcexe}') + '" ' + Params + '"';
+  if AsOriginalUser then
+    Result := ExecAsOriginalUser(ExpandConstant('{cmd}'), CmdParams, '', SW_HIDE, ewWaitUntilTerminated, Code)
+  else
+    Result := Exec(ExpandConstant('{cmd}'), CmdParams, '', SW_HIDE, ewWaitUntilTerminated, Code);
 end;
 
 // Clip a control to a rounded rectangle. The corners become transparent to
@@ -282,27 +254,6 @@ begin
   Pref := DWMWCP_ROUND;
   DwmSetWindowAttribute(WizardForm.Handle, DWMWA_WINDOW_CORNER_PREFERENCE,
     Pref, SizeOf(Pref));
-end;
-
-// The scope an existing DaperZip was installed in. Updates must follow it:
-// defaulting a per-user 0.1.0 (NSIS) install to "all users" makes Setup ask
-// for admin rights, which fails for a standard user and lands on NeedAdmin.
-function ExistingAllUsers: Boolean;
-begin
-  if RegKeyExists(HKLM, UninstKey) then
-    Result := True
-  else if RegKeyExists(HKCU, UninstKey) then
-    Result := False
-  else if HasNsisInstall(AllUsersDir) then
-    Result := True
-  else if HasNsisInstall(NsisUserDir) then
-    Result := False
-  else if RegKeyExists(HKLM, NsisUninstKey) then
-    Result := True
-  else if RegKeyExists(HKCU, NsisUninstKey) then
-    Result := False
-  else
-    Result := CanElevate; // fresh install: all users only if we can elevate
 end;
 
 function NewLabel(Parent: TWinControl; const Text: String; X, Y, W: Integer;
@@ -369,17 +320,25 @@ begin
   NewLabel(Parent, CustomMessage('Subtitle'), ScaleX(32) + Size + ScaleX(15), ScaleY(24) + ScaleY(36), 0, 9, Muted, False);
 end;
 
-// ---------------------------------------------------------------- scope cards
+// ---------------------------------------------------------------- scope buttons
 
 procedure PaintScope;
 begin
   if ScopeAll.Checked then
   begin
-    ScopeAllCard.Color := AccentSoft;
-    ScopeMeCard.Color := clWhite;
+    ScopeAllCard.Color := Accent;
+    ScopeAllTitle.Font.Color := clWhite;
+    ScopeAllNote.Font.Color := AccentSoft;
+    ScopeMeCard.Color := PillIdle;
+    ScopeMeTitle.Font.Color := Ink;
+    ScopeMeNote.Font.Color := Muted;
   end else begin
-    ScopeAllCard.Color := clWhite;
-    ScopeMeCard.Color := AccentSoft;
+    ScopeAllCard.Color := PillIdle;
+    ScopeAllTitle.Font.Color := Ink;
+    ScopeAllNote.Font.Color := Muted;
+    ScopeMeCard.Color := Accent;
+    ScopeMeTitle.Font.Color := clWhite;
+    ScopeMeNote.Font.Color := AccentSoft;
   end;
   if not DirTouched then
   begin
@@ -388,7 +347,7 @@ begin
   end;
 end;
 
-// The two radios sit on separate cards, so keep them exclusive by hand.
+// The two radios sit on separate buttons, so keep them exclusive by hand.
 procedure ScopeClick(Sender: TObject);
 var
   C: TControl;
@@ -401,30 +360,50 @@ begin
   PaintScope;
 end;
 
-function NewScopeCard(Parent: TWinControl; X, Y, W, H: Integer; const Title, Note: String;
-  var Radio: TNewRadioButton): TPanel;
-var
-  N: TNewStaticText;
+function NewScopeButton(Parent: TWinControl; X, Y, W, H: Integer; const Title, Note: String;
+  var Radio: TNewRadioButton; var TitleLbl, NoteLbl: TLabel): TPanel;
 begin
   Result := TPanel.Create(WizardForm);
   Result.Parent := Parent;
   Result.SetBounds(X, Y, W, H);
   Result.BevelOuter := bvNone;
-  Result.BorderStyle := bsSingle;
   Result.ParentBackground := False;
-  Result.Color := clWhite;
+  Result.Color := PillIdle;
   Result.Cursor := crHand;
   Result.OnClick := @ScopeClick;
-  RoundControl(Result, ScaleY(10));
+  // Fully rounded ends: the corner ellipse is as tall as the button.
+  RoundControl(Result, H);
+  // The radio carries the checked state; the whole pill is the button.
   Radio := TNewRadioButton.Create(WizardForm);
   Radio.Parent := Result;
-  Radio.SetBounds(ScaleX(12), ScaleY(8), W - ScaleX(20), ScaleY(20));
+  Radio.Visible := False;
   Radio.Caption := Title;
-  Radio.Font.Size := 10;
-  Radio.Font.Color := Ink;
   Radio.OnClick := @ScopeClick;
-  N := NewLabel(Result, Note, ScaleX(30), ScaleY(30), 0, 8, Muted, False);
-  N.OnClick := @ScopeClick;
+  TitleLbl := TLabel.Create(WizardForm);
+  TitleLbl.Parent := Result;
+  TitleLbl.AutoSize := False;
+  TitleLbl.SetBounds(ScaleX(16), H div 2 - ScaleY(19), W - ScaleX(32), ScaleY(18));
+  TitleLbl.Alignment := taCenter;
+  TitleLbl.Layout := tlCenter;
+  TitleLbl.Caption := Title;
+  TitleLbl.Font.Size := 10;
+  TitleLbl.Font.Style := [fsBold];
+  TitleLbl.Font.Color := Ink;
+  TitleLbl.Transparent := True;
+  TitleLbl.Cursor := crHand;
+  TitleLbl.OnClick := @ScopeClick;
+  NoteLbl := TLabel.Create(WizardForm);
+  NoteLbl.Parent := Result;
+  NoteLbl.AutoSize := False;
+  NoteLbl.SetBounds(ScaleX(16), H div 2 + ScaleY(1), W - ScaleX(32), ScaleY(16));
+  NoteLbl.Alignment := taCenter;
+  NoteLbl.Layout := tlCenter;
+  NoteLbl.Caption := Note;
+  NoteLbl.Font.Size := 8;
+  NoteLbl.Font.Color := Muted;
+  NoteLbl.Transparent := True;
+  NoteLbl.Cursor := crHand;
+  NoteLbl.OnClick := @ScopeClick;
 end;
 
 procedure DirEditChange(Sender: TObject);
@@ -468,9 +447,15 @@ begin
   Result := ScaleX(32);
 end;
 
+function StripLift: Integer;
+begin
+  // extra breathing room between the bottom controls and the window edge
+  Result := ScaleY(10);
+end;
+
 function StripTop(H: Integer): Integer;
 begin
-  Result := WizardForm.CancelButton.Top + (WizardForm.CancelButton.Height - H) div 2;
+  Result := WizardForm.CancelButton.Top + (WizardForm.CancelButton.Height - H) div 2 - StripLift;
 end;
 
 function NewStripButton(const Text: String; W: Integer; OnClick: TNotifyEvent; var Lbl: TLabel): TPanel;
@@ -482,81 +467,73 @@ begin
   Result.BringToFront;
 end;
 
-// "All users" from a non-admin setup: run this installer again, elevated
-// and silent, and wait for it; this window shows progress meanwhile.
-function InstallElevated: Boolean;
-var
-  Params, ElevatedExe: String;
-  Code: Integer;
-  Copied, Launched: Boolean;
+procedure BeginWait;
 begin
-  Result := False;
   ErrorText.Caption := '';
   InstallBtn.Visible := False;
   StatusText.Visible := True;
   Marquee.Visible := True;
   WizardForm.Refresh;
+end;
 
-  // A setup started from Downloads or a per-user Temp folder is often not
-  // readable by the administrator account UAC switches to, which makes
-  // ShellExec('runas') fail. Keep the copy in a location both accounts can
-  // read, owned by this user so other standard users cannot modify it.
-  Copied := False;
-  ElevatedExe := ExpandConstant('{srcexe}');
-  if ForceDirectories(ExpandConstant('{commonappdata}\{#AppName}\{username}')) then
-  begin
-    if FileCopy(ElevatedExe,
-      ExpandConstant('{commonappdata}\{#AppName}\{username}\DaperZipSetup.exe'), False) then
-    begin
-      ElevatedExe := ExpandConstant('{commonappdata}\{#AppName}\{username}\DaperZipSetup.exe');
-      Copied := True;
-    end;
-  end;
-
-  Params := '/ALLUSERS /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /LANG=' + ActiveLanguage +
-    ' /DIR="' + DirEdit.Text + '" /TASKS="' + TaskList + '"';
-
-  // If this setup was already started as administrator, run the /ALLUSERS
-  // copy with the same token instead of asking UAC to elevate it again.
-  if IsAdmin then
-    Launched := Exec(ElevatedExe, Params, '', SW_SHOWNORMAL, ewWaitUntilTerminated, Code)
-  else
-    Launched := ShellExec('runas', ElevatedExe, Params, '', SW_SHOWNORMAL, ewWaitUntilTerminated, Code);
-
-  if Copied then
-    DeleteFile(ElevatedExe);
-
-  if not Launched then
-  begin
-    ErrorText.Caption := CustomMessage('NeedAdmin');
-    // Fall back to a per-user install: it needs no administrator rights, so
-    // the next Install click succeeds even on a standard account.
-    ScopeAll.Checked := False;
-    ScopeMe.Checked := True;
-    DirTouched := False;
-    PaintScope;
-  end
-  else if Code <> 0 then
-    ErrorText.Caption := FmtMessage(CustomMessage('Failed'), [IntToStr(Code)])
-  else
-    Result := True;
+procedure EndWait(Ok: Boolean);
+begin
   StatusText.Visible := False;
   Marquee.Visible := False;
-  if Result then
+  if Ok then
     ShowDone(DirEdit.Text)
   else
     InstallBtn.Visible := True;
 end;
 
+function SilentParams(const Scope: String): String;
+begin
+  Result := Scope + ' /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /LANG=' + ActiveLanguage +
+    ' /DIR="' + DirEdit.Text + '" /TASKS="' + TaskList + '"';
+end;
+
+// The chosen scope differs from how this Setup runs, so run a silent copy
+// with that scope and wait: "All users" from a non-elevated window asks UAC
+// (Inno's own prompt); "Just me" from the elevated window runs as the
+// account that started Setup, so the per-user install lands in its profile.
+procedure InstallOtherScope(AllUsers: Boolean);
+var
+  Code: Integer;
+  Ok: Boolean;
+begin
+  BeginWait;
+  if AllUsers then
+    Ok := RunSetupAgain(SilentParams('/ALLUSERS'), False, Code)
+  else
+    Ok := RunSetupAgain(SilentParams('/CURRENTUSER'), True, Code);
+  if Ok and (Code = 0) then
+  begin
+    EndWait(True);
+    exit;
+  end;
+  if AllUsers and (not Ok or (Code = 2)) then
+  begin
+    // UAC cancelled or refused: offer the per-user install instead.
+    ErrorText.Caption := CustomMessage('NeedAdmin');
+    ScopeAll.Checked := False;
+    ScopeMe.Checked := True;
+    DirTouched := False;
+    PaintScope;
+  end
+  else
+    ErrorText.Caption := FmtMessage(CustomMessage('Failed'), [IntToStr(Code)]);
+  EndWait(False);
+end;
+
 procedure InstallClick(Sender: TObject);
 begin
   ErrorText.Caption := '';
-  if ScopeAll.Checked and not IsAdminInstallMode then
+  if ScopeAll.Checked <> IsAdminInstallMode then
   begin
-    InstallElevated;
+    InstallOtherScope(ScopeAll.Checked);
     exit;
   end;
-  // Just me (or already elevated): normal install in this process.
+  // The scope matches this process: normal install right here.
   WizardForm.DirEdit.Text := DirEdit.Text;
   WizardSelectTasks('!contextmenu,!desktopicon');
   if TaskList <> '' then WizardSelectTasks(TaskList);
@@ -602,7 +579,7 @@ begin
   CloseBtn := TNewButton.Create(WizardForm);
   CloseBtn.Parent := WizardForm;
   CloseBtn.Caption := CustomMessage('Close');
-  CloseBtn.SetBounds(StripMargin, WizardForm.CancelButton.Top, WizardForm.CancelButton.Width, WizardForm.CancelButton.Height);
+  CloseBtn.SetBounds(StripMargin, StripTop(WizardForm.CancelButton.Height), WizardForm.CancelButton.Width, WizardForm.CancelButton.Height);
   CloseBtn.OnClick := @CloseClick;
 end;
 
@@ -624,8 +601,8 @@ begin
   NewLabel(S, CustomMessage('ScopeLabel'), X, Y, 0, 8, Muted, True);
   Y := Y + ScaleY(20);
   Half := (W - 2 * X - ScaleX(10)) div 2;
-  ScopeAllCard := NewScopeCard(S, X, Y, Half, ScaleY(54), CustomMessage('ScopeAll'), CustomMessage('ScopeAllNote'), ScopeAll);
-  ScopeMeCard := NewScopeCard(S, X + Half + ScaleX(10), Y, Half, ScaleY(54), CustomMessage('ScopeMe'), CustomMessage('ScopeMeNote'), ScopeMe);
+  ScopeAllCard := NewScopeButton(S, X, Y, Half, ScaleY(54), CustomMessage('ScopeAll'), CustomMessage('ScopeAllNote'), ScopeAll, ScopeAllTitle, ScopeAllNote);
+  ScopeMeCard := NewScopeButton(S, X + Half + ScaleX(10), Y, Half, ScaleY(54), CustomMessage('ScopeMe'), CustomMessage('ScopeMeNote'), ScopeMe, ScopeMeTitle, ScopeMeNote);
 
   Y := Y + ScaleY(68);
   NewLabel(S, CustomMessage('DirLabel'), X, Y, 0, 8, Muted, True);
@@ -656,7 +633,8 @@ begin
   DesktopCheck.Checked := True;
 
   FooterText := NewLabel(WizardForm, CustomMessage('Footer'), StripMargin,
-    WizardForm.CancelButton.Top + ScaleY(6), 0, 8, Muted, False);
+    0, 0, 8, Muted, False);
+  FooterText.Top := StripTop(FooterText.Height);
   InstallBtn := NewStripButton(CustomMessage('Install'), ScaleX(150), @InstallClick, InstallBtnLabel);
 
   Y := Y + ScaleY(34);
@@ -669,12 +647,35 @@ begin
   Marquee.Visible := False;
   ErrorText := NewLabel(S, '', X, Y, W - 2 * X, 9, $3B48E5, False);
 
-  // Follow an existing install's scope (Inno Setup or the older NSIS build);
-  // a fresh install defaults to all users.
-  ScopeAll.Checked := ExistingAllUsers;
-  if IsAdminInstallMode then ScopeAll.Checked := True;
+  // The scope follows how this Setup runs: elevated (UAC accepted at start)
+  // installs for all users, otherwise just for this account. "All users"
+  // without elevation re-runs Setup elevated when Install is clicked.
+  ScopeAll.Checked := IsAdminInstallMode;
   ScopeMe.Checked := not ScopeAll.Checked;
   PaintScope;
+  if ElevationRefused then
+    ErrorText.Caption := CustomMessage('NeedAdmin');
+end;
+
+// An interactive Setup asks for administrator rights right away: it starts
+// itself again with /ALLUSERS, which triggers Inno's own UAC prompt, and the
+// elevated copy shows the installer window. This process just waits and
+// exits with its result. When UAC is cancelled or refused (exit code 2), or
+// the account cannot elevate, this process carries on as a "Just me" setup.
+// Silent runs and runs that already name a scope are left alone.
+function InitializeSetup: Boolean;
+var
+  Code: Integer;
+begin
+  Result := True;
+  if WizardSilent or IsAdmin or HasParam('/ALLUSERS') or HasParam('/CURRENTUSER') then
+    exit;
+  // Even a standard account gets the prompt: an administrator can type their
+  // password there. Exit code 2 = UAC cancelled/refused.
+  if RunSetupAgain('/ALLUSERS', False, Code) and (Code <> 2) then
+    Result := False  // the elevated copy ran (installed, or was closed)
+  else
+    ElevationRefused := True;
 end;
 
 procedure InitializeWizard;
